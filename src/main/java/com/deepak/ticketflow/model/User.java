@@ -18,6 +18,18 @@ public class User {
     Role role;
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+
+    @Override
+    public String toString() {
+        return "User{" +
+                "id=" + id +
+                ", userName='" + userName + '\'' +
+                ", password='" + password + '\'' +
+                ", role=" + role +
+                ", createdAt=" + createdAt +
+                '}';
+    }
+
     @PrePersist
     public void prePersist() {
         this.createdAt = LocalDateTime.now();

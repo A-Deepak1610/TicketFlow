@@ -31,7 +31,7 @@ public class UserService {
         User user = new User();
         user.setUserName(userDto.userName());
         user.setPassword(passwordEncoder.encode(userDto.password()));
-        user.setRole(Role.USER);
+        user.setRole(Role.ROLE_USER);
         return userRepo.save(user);
     }
     public boolean exists(String userName){
