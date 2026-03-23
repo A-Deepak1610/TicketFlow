@@ -1,6 +1,6 @@
 package com.deepak.ticketflow.service;
 
-import com.deepak.ticketflow.Role;
+import com.deepak.ticketflow.Enum.Role;
 import com.deepak.ticketflow.dto.UserDto;
 import com.deepak.ticketflow.model.RefreshToken;
 import com.deepak.ticketflow.model.User;
@@ -31,7 +31,7 @@ public class UserService {
         User user = new User();
         user.setUserName(userDto.userName());
         user.setPassword(passwordEncoder.encode(userDto.password()));
-        user.setRole(Role.ROLE_USER);
+        user.setRole(Role.ROLE_ADMIN);
         return userRepo.save(user);
     }
     public boolean exists(String userName){
