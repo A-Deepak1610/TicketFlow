@@ -1,4 +1,4 @@
-package com.deepak.ticketflow;
+package com.deepak.ticketflow.Enum;
 
 public enum Role {
     ROLE_USER,

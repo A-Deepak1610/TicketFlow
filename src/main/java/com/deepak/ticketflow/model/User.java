@@ -1,11 +1,12 @@
 package com.deepak.ticketflow.model;
 
-import com.deepak.ticketflow.Role;
+import com.deepak.ticketflow.Enum.Role;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
 
 @Entity
+@Table(name="users")
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
