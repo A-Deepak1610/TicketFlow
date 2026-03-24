@@ -1,19 +1,31 @@
 package com.deepak.ticketflow.controller;
 
 import com.deepak.ticketflow.dto.CreateEventRequest;
+import com.deepak.ticketflow.model.Event;
+import com.deepak.ticketflow.repository.SeatRepository;
 import com.deepak.ticketflow.service.EventService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
-@RequestMapping("/admin")
 public class EventController {
     @Autowired
     EventService eventService;
+    @Autowired
+    SeatRepository seatRepository;
+    @GetMapping("/events")
+    public ResponseEntity<?> getEvents(){
+        System.out.println("getEvents");
+        return new ResponseEntity<>(eventService.getEvents(), HttpStatus.OK);
+    }
+
     @PreAuthorize("hasRole('ADMIN')")
-    @PostMapping("/events")
+    @PostMapping("/admin/events")
     public ResponseEntity<?> createEvent(@RequestBody CreateEventRequest request) {
         return ResponseEntity.ok(eventService.createEvent(request));
     }
