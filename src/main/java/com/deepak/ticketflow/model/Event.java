@@ -4,6 +4,7 @@ import com.deepak.ticketflow.Enum.EventStatus;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "events")
@@ -23,12 +24,22 @@ public class Event {
 
     private int availableSeats;
 
+    @Version
+    private Long version;
+
     @Enumerated(EnumType.STRING)
     private EventStatus status;
 
     private LocalDateTime saleStartTime;
 
     private LocalDateTime createdAt = LocalDateTime.now();
+//    “Hey JPA, go to the Seat class
+//    and look for a field called event
+//    that field owns this relationship”
+    @OneToMany(mappedBy = "event", cascade = CascadeType.ALL)// Cascade = Automatically apply operations from parent → child
+    private List<Seat> seats;
+
+
 
     public Long getEventId() {
         return eventId;
@@ -76,6 +87,14 @@ public class Event {
 
     public void setAvailableSeats(int availableSeats) {
         this.availableSeats = availableSeats;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
     }
 
     public EventStatus getStatus() {

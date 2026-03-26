@@ -1,14 +1,24 @@
 package com.deepak.ticketflow.model;
 
-import com.deepak.ticketflow.Enum.SeatStatus;
-import com.deepak.ticketflow.Enum.SeatType;
-import jakarta.persistence.*;
-
-import java.time.LocalDateTime;
-
-import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+
+import com.deepak.ticketflow.Enum.SeatStatus;
+import com.deepak.ticketflow.Enum.SeatType;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 @Entity
 @Table(name = "seats")
@@ -19,6 +29,11 @@ public class Seat {
     private Long seatId;
     @Column(name = "event_id", nullable = false)
     private Long eventId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "event_id", nullable = false, insertable = false, updatable = false)
+    private Event event;
+
     @Column(name = "seat_number", length = 20)
     private String seatNumber;
     @Column(name = "section", length = 50)
@@ -36,12 +51,13 @@ public class Seat {
     @Version
     @Column(name = "version")
     private Long version;
-    @Column(name = "reserved_by", length = 50)
-    private String reservedBy;
+    @Column(name = "reserved_by")
+    private Integer reservedBy;
     @Column(name = "reserved_until")
     private LocalDateTime reservedUntil;
     @Column(name = "booking_id")
     private Long bookingId;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
     // Auto set created time
@@ -64,6 +80,14 @@ public class Seat {
 
     public void setEventId(Long eventId) {
         this.eventId = eventId;
+    }
+
+    public Event getEvent() {
+        return event;
+    }
+
+    public void setEvent(Event event) {
+        this.event = event;
     }
 
     public String getSeatNumber() {
@@ -141,11 +165,11 @@ public class Seat {
         this.version = version;
     }
 
-    public String getReservedBy() {
+    public Integer getReservedBy() {
         return reservedBy;
     }
 
-    public void setReservedBy(String reservedBy) {
+    public void setReservedBy(Integer reservedBy) {
         this.reservedBy = reservedBy;
     }
 
