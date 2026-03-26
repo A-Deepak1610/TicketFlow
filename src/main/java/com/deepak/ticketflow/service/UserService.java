@@ -57,4 +57,13 @@ public class UserService {
         }
         return null;
     }
+    public String generateNewAccessToken(String refreshToken) {
+        RefreshToken token = refreshTokenService
+                .findByToken(refreshToken)
+                .orElseThrow(() -> new RuntimeException("Refresh token not found"));
+        refreshTokenService.verifyExpiration(token);
+        String username = token.getUser().getUserName();
+        User user = userRepo.findByUserName(username);
+        return jwt.generateToken(user);
+    }
 }

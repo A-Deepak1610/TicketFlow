@@ -1,5 +1,6 @@
 package com.deepak.ticketflow.service;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -111,11 +112,17 @@ public class TicketBookingService {
 
     // ─────────────────────────────────────────────────────────────
     // STEP 2 — Confirm booking (idempotent)
+    // Accepts MULTIPLE reservation IDs — processes all atomically
+    // If ANY validation/payment fails, ALL reservations are rolled back
     // ─────────────────────────────────────────────────────────────
     @Transactional
-    public BookingResponse confirmBooking(Long reservationId,
+    public BookingResponse confirmBooking(List<Long> reservationIds,
                                           PaymentRequest paymentRequest,
                                           String idempotencyKey) {
+
+        if (reservationIds == null || reservationIds.isEmpty()) {
+            throw new InvalidReservationException("At least one reservation ID required");
+        }
 
         // Idempotency check — if we already processed this key, return existing booking
         return bookingRepository.findByIdempotencyKey(idempotencyKey)
@@ -124,80 +131,123 @@ public class TicketBookingService {
                             existing.getBookingReference());
                     return new BookingResponse(existing);
                 })
-                .orElseGet(() -> processNewBooking(
-                        reservationId, paymentRequest, idempotencyKey));
+                .orElseGet(() -> processNewMultiSeatBooking(
+                        reservationIds, paymentRequest, idempotencyKey));
     }
 
-    private BookingResponse processNewBooking(Long reservationId,
-                                              PaymentRequest paymentRequest,
-                                              String idempotencyKey) {
-        Reservation reservation = reservationRepository.findById(reservationId)
-                .orElseThrow(() -> new ReservationNotFoundException(
-                        "Reservation not found: " + reservationId));
+    private BookingResponse processNewMultiSeatBooking(List<Long> reservationIds,
+                                                        PaymentRequest paymentRequest,
+                                                        String idempotencyKey) {
+        LocalDateTime now = LocalDateTime.now();
+        List<Reservation> reservations = new ArrayList<>();
+        List<Seat> seats = new ArrayList<>();
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        Integer userId = null;
+        Long eventId = null;
 
-        // Guard: expired?
-        if (LocalDateTime.now().isAfter(reservation.getExpiresAt())) {
-            reservation.setStatus(ReservationStatus.EXPIRED);
-            reservationRepository.save(reservation);
-            throw new ReservationExpiredException(
-                    "Reservation expired. Please select your seats again.");
+        // ─── STEP 1: Validate all reservations
+        for (Long reservationId : reservationIds) {
+            Reservation reservation = reservationRepository.findById(reservationId)
+                    .orElseThrow(() -> new ReservationNotFoundException(
+                            "Reservation not found: " + reservationId));
+
+            // Check expiry
+            if (now.isAfter(reservation.getExpiresAt())) {
+                reservation.setStatus(ReservationStatus.EXPIRED);
+                reservationRepository.save(reservation);
+                throw new ReservationExpiredException(
+                        "Reservation " + reservationId + " expired. Please select seats again.");
+            }
+
+            // Check active status
+            if (reservation.getStatus() != ReservationStatus.ACTIVE) {
+                throw new InvalidReservationException(
+                        "Reservation " + reservationId + " is not active");
+            }
+
+            Seat seat = seatRepository.findById(reservation.getSeatId())
+                    .orElseThrow(() -> new SeatNotFoundException(
+                            "Seat not found for reservation: " + reservationId));
+
+            // Check seat state
+            if (seat.getStatus() != SeatStatus.RESERVED
+                    || !reservation.getUserId().equals(seat.getReservedBy())) {
+                throw new InvalidSeatStateException(
+                        "Seat " + seat.getSeatNumber() + " state has changed");
+            }
+
+            // Accumulate
+            reservations.add(reservation);
+            seats.add(seat);
+            totalAmount = totalAmount.add(seat.getPrice());
+
+            // Ensure all reservations are for same event & user
+            if (userId == null) {
+                userId = reservation.getUserId();
+                eventId = reservation.getEventId();
+            } else if (eventId != null && (!userId.equals(reservation.getUserId())
+                    || !eventId.equals(reservation.getEventId()))) {
+                throw new InvalidReservationException(
+                        "All reservations must be for same event and user");
+            }
         }
 
-        if (reservation.getStatus() != ReservationStatus.ACTIVE) {
-            throw new InvalidReservationException("Reservation is not active");
-        }
+        log.info("Validated {} reservations for user {}, total amount: {}",
+                reservationIds.size(), userId, totalAmount);
 
-        Seat seat = seatRepository.findById(reservation.getSeatId())
-                .orElseThrow(() -> new SeatNotFoundException("Seat not found"));
-
-        // Double-check seat is still reserved by this user
-        if (seat.getStatus() != SeatStatus.RESERVED
-                || !userId(reservation).equals(seat.getReservedBy())) {
-            throw new InvalidSeatStateException("Seat state has changed");
-        }
-
-        // Process payment — if this throws, @Transactional rolls everything back
+        // ─── STEP 2: Process payment (single payment for all seats)
+        //      If this fails, everything rolls back
         PaymentResponse payment = paymentService.processPayment(paymentRequest);
         if (!payment.isSuccess()) {
             throw new PaymentFailedException("Payment failed: " + payment.getErrorMessage());
         }
 
-        // Create booking
+        log.info("Payment processed: {} {}", payment.getPaymentId(), totalAmount);
+
+        // ─── STEP 3: Create ONE booking for all seats
         Booking booking = new Booking();
-        booking.setEventId(reservation.getEventId());
-        booking.setUserId(reservation.getUserId());
-        booking.setTotalAmount(seat.getPrice());
+        booking.setEventId(eventId);
+        booking.setUserId(userId);
+        booking.setTotalAmount(totalAmount);
         booking.setStatus(BookingStatus.CONFIRMED);
         booking.setPaymentId(payment.getPaymentId());
         booking.setPaymentStatus("SUCCESS");
         booking.setBookingReference(generateBookingReference());
         booking.setIdempotencyKey(idempotencyKey);
-        booking.setConfirmedAt(LocalDateTime.now());
+        booking.setConfirmedAt(now);
         booking = bookingRepository.save(booking);
 
-        // Create booking-seat link (price snapshot)
-        BookingSeat bookingSeat = new BookingSeat();
-        bookingSeat.setBookingId(booking.getBookingId());
-        bookingSeat.setSeatId(seat.getSeatId());
-        bookingSeat.setPrice(seat.getPrice());
-        bookingSeatRepository.save(bookingSeat);
+        log.info("Booking created: {}", booking.getBookingReference());
 
-        // Update seat → BOOKED
-        seat.setStatus(SeatStatus.BOOKED);
-        seat.setBookingId(booking.getBookingId());
-        seat.setReservedBy(null);
-        seat.setReservedUntil(null);
-        seatRepository.save(seat);
+        // ─── STEP 4: Link all seats to this booking
+        for (Seat seat : seats) {
+            BookingSeat bookingSeat = new BookingSeat();
+            bookingSeat.setBookingId(booking.getBookingId());
+            bookingSeat.setSeatId(seat.getSeatId());
+            bookingSeat.setPrice(seat.getPrice());
+            bookingSeatRepository.save(bookingSeat);
+        }
 
-        // Update reservation → CONFIRMED
-        reservation.setStatus(ReservationStatus.CONFIRMED);
-        reservationRepository.save(reservation);
+        // ─── STEP 5: Update all seats to BOOKED
+        for (Seat seat : seats) {
+            seat.setStatus(SeatStatus.BOOKED);
+            seat.setBookingId(booking.getBookingId());
+            seat.setReservedBy(null);
+            seat.setReservedUntil(null);
+            seatRepository.save(seat);
+        }
 
-        // Decrement available seat count (with optimistic retry)
-        updateAvailableSeats(reservation.getEventId(), -1);
+        // ─── STEP 6: Update all reservations to CONFIRMED
+        for (Reservation reservation : reservations) {
+            reservation.setStatus(ReservationStatus.CONFIRMED);
+            reservationRepository.save(reservation);
+        }
 
-        log.info("Booking confirmed: {} for user {}",
-                booking.getBookingReference(), reservation.getUserId());
+        // ─── STEP 7: Decrement available seat count
+        updateAvailableSeats(eventId, -seats.size());
+
+        log.info("Booking confirmed: {} for user {} ({} seats)",
+                booking.getBookingReference(), userId, seats.size());
 
         return new BookingResponse(booking);
     }
@@ -289,9 +339,5 @@ public class TicketBookingService {
 
     private String generateBookingReference() {
         return "TF-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-    }
-
-    private Integer userId(Reservation r) {
-        return r.getUserId();
     }
 }
