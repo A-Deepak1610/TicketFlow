@@ -63,7 +63,6 @@ public class TicketBookingService {
                                             Integer userId) {
         String lockValue = UUID.randomUUID().toString();
         List<String> acquiredLocks = new ArrayList<>();
-
         try {
             // Acquire distributed locks (sorted to avoid deadlock)
             acquiredLocks = redisLockService.acquireSeatsLock(
@@ -180,7 +179,6 @@ public class TicketBookingService {
             reservations.add(reservation);
             seats.add(seat);
             totalAmount = totalAmount.add(seat.getPrice());
-
             // Ensure all reservations are for same event & user
             if (userId == null) {
                 userId = reservation.getUserId();
