@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -36,5 +37,19 @@ public class UserContoller {
             return new ResponseEntity<>("Not authorised", HttpStatus.UNAUTHORIZED);
         }
         return new ResponseEntity<>(tokens, HttpStatus.OK);
+    }
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refresh(@RequestBody Map<String,String> request){
+        String refreshToken = request.get("refreshToken");
+        try{
+            String newAccessToken =
+                    userService.generateNewAccessToken(refreshToken);
+            Map<String,String> response = new HashMap<>();
+            response.put("accessToken", newAccessToken);
+            return new ResponseEntity<>(response,HttpStatus.OK);
+        }catch (Exception e){
+            return new ResponseEntity<>("Invalid refresh token",
+                    HttpStatus.UNAUTHORIZED);
+        }
     }
 }

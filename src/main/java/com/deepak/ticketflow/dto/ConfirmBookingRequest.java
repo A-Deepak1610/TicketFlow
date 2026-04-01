@@ -1,15 +1,17 @@
 package com.deepak.ticketflow.dto;
 
+import java.util.List;
+
 public class ConfirmBookingRequest {
-    private Long reservationId;
+    private List<Long> reservationIds;
     private PaymentRequest paymentRequest;
 
-    public Long getReservationId() {
-        return reservationId;
+    public List<Long> getReservationIds() {
+        return reservationIds;
     }
 
-    public void setReservationId(Long reservationId) {
-        this.reservationId = reservationId;
+    public void setReservationIds(List<Long> reservationIds) {
+        this.reservationIds = reservationIds;
     }
 
     public PaymentRequest getPaymentRequest() {
