@@ -22,6 +22,7 @@ public class JwtService {
         System.out.print(user);
         return Jwts.builder()
                 .subject(user.getUserName())
+                .claim("userId", user.getId())
                 .claim("role",user.getRole().name())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis()+1000*60*60*30))
@@ -37,6 +38,14 @@ public class JwtService {
                 .getSubject();//this retrives the username
     }
 
+    public Integer extractUserId(String token){
+        return Jwts.parser()
+                .verifyWith((SecretKey) getKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .get("userId", Integer.class);
+    }
     private boolean isTokenExpired(String token){
         Date expiration = Jwts.parser()
                 .verifyWith((SecretKey) getKey())

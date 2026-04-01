@@ -1,5 +1,6 @@
 package com.deepak.ticketflow.controller;
 
+import com.deepak.ticketflow.filters.CustomUserPrincipal;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -20,20 +21,15 @@ import com.deepak.ticketflow.service.TicketBookingService;
 public class BookingController{
     @Autowired
     private TicketBookingService ticketBookingService;
-    /**
-     * Step 1 — Reserve seats (authenticated user)
-     * POST /api/reservations
-     */
-    @PostMapping("/reservations")
-    public ResponseEntity<ReservationResponse> reserveSeats(
-            @RequestBody ReservationRequest request,
-            @AuthenticationPrincipal Integer userId) {
 
-        Integer finalUserId = userId != null ? userId : 1;
+    @PostMapping("/reservations")
+    public ResponseEntity<ReservationResponse> reserveSeats(@RequestBody ReservationRequest request,
+                                                            @AuthenticationPrincipal CustomUserPrincipal principal) {
+      Integer userId=principal.getUserId();
         ReservationResponse response = ticketBookingService.reserveSeats(
                 request.getEventId(),
                 request.getSeatNumbers(),
-                finalUserId
+                userId
         );
         return ResponseEntity.ok(response);
     }
@@ -48,8 +44,7 @@ public class BookingController{
     public ResponseEntity<BookingResponse> confirmBooking(
             @RequestBody ConfirmBookingRequest request,
             @RequestHeader("Idempotency-Key") String idempotencyKey,
-            @AuthenticationPrincipal Integer userId) {
-
+            @AuthenticationPrincipal CustomUserPrincipal principal) {
         BookingResponse response = ticketBookingService.confirmBooking(
                 request.getReservationIds(),
                 request.getPaymentRequest(),
