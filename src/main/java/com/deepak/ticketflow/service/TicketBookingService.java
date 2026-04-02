@@ -42,10 +42,8 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @Slf4j
 public class TicketBookingService {
-
     private static final int  RESERVATION_TIMEOUT_MINUTES = 10;
     private static final Duration LOCK_TTL = Duration.ofSeconds(30);
-
     @Autowired private SeatRepository        seatRepository;
     @Autowired private BookingRepository     bookingRepository;
     @Autowired private BookingSeatRepository bookingSeatRepository;
@@ -53,10 +51,6 @@ public class TicketBookingService {
     @Autowired private EventRepository       eventRepository;
     @Autowired private RedisLockService      redisLockService;
     @Autowired private PaymentService        paymentService;
-
-    // ─────────────────────────────────────────────────────────────
-    // STEP 1 — Reserve seats
-    // ─────────────────────────────────────────────────────────────
     @Transactional
     public ReservationResponse reserveSeats(Long eventId,
                                             List<String> seatNumbers,
@@ -108,12 +102,9 @@ public class TicketBookingService {
             redisLockService.releaseAll(acquiredLocks, lockValue);
         }
     }
-
-    // ─────────────────────────────────────────────────────────────
     // STEP 2 — Confirm booking (idempotent)
     // Accepts MULTIPLE reservation IDs — processes all atomically
     // If ANY validation/payment fails, ALL reservations are rolled back
-    // ─────────────────────────────────────────────────────────────
     @Transactional
     public BookingResponse confirmBooking(List<Long> reservationIds,
                                           PaymentRequest paymentRequest,
@@ -174,7 +165,7 @@ public class TicketBookingService {
                 throw new InvalidSeatStateException(
                         "Seat " + seat.getSeatNumber() + " state has changed");
             }
-
+            
             // Accumulate
             reservations.add(reservation);
             seats.add(seat);
@@ -199,9 +190,7 @@ public class TicketBookingService {
         if (!payment.isSuccess()) {
             throw new PaymentFailedException("Payment failed: " + payment.getErrorMessage());
         }
-
         log.info("Payment processed: {} {}", payment.getPaymentId(), totalAmount);
-
         // ─── STEP 3: Create ONE booking for all seats
         Booking booking = new Booking();
         booking.setEventId(eventId);
@@ -214,9 +203,7 @@ public class TicketBookingService {
         booking.setIdempotencyKey(idempotencyKey);
         booking.setConfirmedAt(now);
         booking = bookingRepository.save(booking);
-
         log.info("Booking created: {}", booking.getBookingReference());
-
         // ─── STEP 4: Link all seats to this booking
         for (Seat seat : seats) {
             BookingSeat bookingSeat = new BookingSeat();
@@ -249,11 +236,36 @@ public class TicketBookingService {
 
         return new BookingResponse(booking);
     }
+    // ─────────────────────────────────────────────────────────────
+    // Helpers
+    // ─────────────────────────────────────────────────────────────
+    private void updateAvailableSeats(Long eventId, int delta) {
+        //I use optimistic locking with a version field to detect concurrent updates.
+        //If an update fails due to a version mismatch, I retry the operation with the latest data to ensure consistency without using heavy database locks.
+        int maxRetries = 3;
+        for (int attempt = 0; attempt < maxRetries; attempt++) {
+            Event event = eventRepository.findById(eventId).orElse(null);
+            if (event == null) return;
+
+            int newCount = Math.max(0, event.getAvailableSeats() + delta);
+            int updated  = eventRepository.updateAvailableSeats(
+                    eventId, event.getVersion(), newCount);
+
+            if (updated > 0) return; // optimistic update succeeded
+            log.warn("Optimistic lock retry {}/{} for event {}", attempt + 1, maxRetries, eventId);
+        }
+        log.error("Failed to update available seat count for event {} after {} retries",
+                eventId, maxRetries);
+    }
+
+    private String generateBookingReference() {
+        return "TF-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+    }
 
     // ─────────────────────────────────────────────────────────────
     // STEP 3 — Cleanup expired reservations
     // ─────────────────────────────────────────────────────────────
-    @Scheduled(fixedRate = 60_000) // every 60 seconds
+    @Scheduled(fixedDelay = 60_000) // every 60 seconds
     public void cleanupExpiredReservations() {
         List<Reservation> expired = reservationRepository
                 .findExpiredReservations(LocalDateTime.now());
@@ -305,7 +317,7 @@ public class TicketBookingService {
                 reservation.setStatus(ReservationStatus.EXPIRED);
                 reservationRepository.save(reservation);
 
-                updateAvailableSeats(reservation.getEventId(), +1);
+//                updateAvailableSeats(reservation.getEventId(), +1);
 
                 log.info("Released expired reservation {} for seat {}",
                         reservation.getReservationId(), seatNumber);
@@ -313,29 +325,5 @@ public class TicketBookingService {
         } finally {
             redisLockService.release(lockKey, lockValue);
         }
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // Helpers
-    // ─────────────────────────────────────────────────────────────
-    private void updateAvailableSeats(Long eventId, int delta) {
-        int maxRetries = 3;
-        for (int attempt = 0; attempt < maxRetries; attempt++) {
-            Event event = eventRepository.findById(eventId).orElse(null);
-            if (event == null) return;
-
-            int newCount = Math.max(0, event.getAvailableSeats() + delta);
-            int updated  = eventRepository.updateAvailableSeats(
-                    eventId, event.getVersion(), newCount);
-
-            if (updated > 0) return; // optimistic update succeeded
-            log.warn("Optimistic lock retry {}/{} for event {}", attempt + 1, maxRetries, eventId);
-        }
-        log.error("Failed to update available seat count for event {} after {} retries",
-                eventId, maxRetries);
-    }
-
-    private String generateBookingReference() {
-        return "TF-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 }
