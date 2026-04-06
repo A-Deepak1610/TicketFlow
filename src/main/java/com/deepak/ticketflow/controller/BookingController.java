@@ -1,7 +1,9 @@
 package com.deepak.ticketflow.controller;
 
 import com.deepak.ticketflow.filters.CustomUserPrincipal;
+import com.deepak.ticketflow.service.queue.VirtualQueueService;  // ← ADD THIS IMPORT
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;  // ← ADD THIS IMPORT
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,16 +18,44 @@ import com.deepak.ticketflow.dto.ReservationRequest;
 import com.deepak.ticketflow.dto.ReservationResponse;
 import com.deepak.ticketflow.service.TicketBookingService;
 
+import java.util.HashMap;  // ← ADD THIS IMPORT
+import java.util.Map;     // ← ADD THIS IMPORT
+
 @RestController
 @RequestMapping("/api")
 public class BookingController{
+
     @Autowired
     private TicketBookingService ticketBookingService;
 
+    @Autowired
+    private VirtualQueueService queueService;  // ← ADD THIS
+
     @PostMapping("/reservations")
-    public ResponseEntity<ReservationResponse> reserveSeats(@RequestBody ReservationRequest request,
-                                                            @AuthenticationPrincipal CustomUserPrincipal principal) {
-      Integer userId=principal.getUserId();
+    public ResponseEntity<?> reserveSeats(  // ← CHANGE ResponseEntity<ReservationResponse> to ResponseEntity<?>
+                                            @RequestBody ReservationRequest request,
+                                            @RequestHeader(value = "X-Queue-Token", required = false) String queueToken,  // ← ADD THIS PARAMETER
+                                            @AuthenticationPrincipal CustomUserPrincipal principal) {
+
+        Integer userId = principal.getUserId();
+
+        // ← START: ADD QUEUE VALIDATION
+        // Validate queue token if present
+        if (queueToken == null || queueToken.isEmpty()) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Queue token required");
+            error.put("message", "Please join the queue first");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+        }
+
+        if (!queueService.validateToken(queueToken, userId)) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Invalid or expired queue token");
+            error.put("message", "Please rejoin the queue");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+        }
+        // ← END: ADD QUEUE VALIDATION
+
         ReservationResponse response = ticketBookingService.reserveSeats(
                 request.getEventId(),
                 request.getSeatNumbers(),
@@ -33,23 +63,54 @@ public class BookingController{
         );
         return ResponseEntity.ok(response);
     }
+
     /**
      * Step 2 — Confirm booking after payment (idempotent via header)
      * Accepts multiple reservation IDs — processes all in one atomic transaction
      * POST /api/bookings/confirm
      * Header: Idempotency-Key: <uuid>
+     * Header: X-Queue-Token: <token-from-queue>
      * Body: { "reservationIds": [123, 124, 125], "paymentRequest": { "amount": 5000.00, "paymentMethod": "UPI" } }
      */
     @PostMapping("/bookings/confirm")
-    public ResponseEntity<BookingResponse> confirmBooking(
-            @RequestBody ConfirmBookingRequest request,
-            @RequestHeader("Idempotency-Key") String idempotencyKey,
-            @AuthenticationPrincipal CustomUserPrincipal principal) {
+    public ResponseEntity<?> confirmBooking(  // ← CHANGE ResponseEntity<BookingResponse> to ResponseEntity<?>
+                                              @RequestBody ConfirmBookingRequest request,
+                                              @RequestHeader("Idempotency-Key") String idempotencyKey,
+                                              @RequestHeader(value = "X-Queue-Token", required = false) String queueToken,  // ← ADD THIS PARAMETER
+                                              @AuthenticationPrincipal CustomUserPrincipal principal) {
+
+        Integer userId = principal.getUserId();
+
+        // ← START: ADD QUEUE VALIDATION
+        // Validate queue token
+        if (queueToken == null || queueToken.isEmpty()) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Queue token required");
+            error.put("message", "Please join the queue first");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+        }
+
+        if (!queueService.validateToken(queueToken, userId)) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Invalid or expired queue token");
+            error.put("message", "Please rejoin the queue");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+        }
+        // ← END: ADD QUEUE VALIDATION
+
         BookingResponse response = ticketBookingService.confirmBooking(
                 request.getReservationIds(),
                 request.getPaymentRequest(),
                 idempotencyKey
         );
+
+        // ← START: ADD TOKEN INVALIDATION ON SUCCESS
+        // Invalidate the queue token after successful booking
+        if (response.isSuccess() && queueToken != null) {
+            queueService.invalidateToken(queueToken, userId);
+        }
+        // ← END: ADD TOKEN INVALIDATION ON SUCCESS
+
         return ResponseEntity.ok(response);
     }
 }
