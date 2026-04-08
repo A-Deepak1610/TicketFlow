@@ -2,6 +2,8 @@
 
 TicketFlow is a Spring Boot backend for high-demand event ticket booking with JWT authentication, virtual queue control, seat reservation, and booking confirmation.
 
+## Booking Flow Diagram
+<img width="1536" height="1024" alt="High-concurrency ticket booking flowchart" src="https://github.com/user-attachments/assets/b88a3225-5c27-4aac-a513-cfbb366fe61b" />
 ## Features
 
 - User registration, login, refresh token flow
@@ -179,39 +181,6 @@ src/main/resources
 └── db/migration/V1__init.sql
 ```
 
-## Booking Flow Diagram
-
-```mermaid
-flowchart TD
-		A[Client App] --> B[POST /register or /login]
-		B --> C[JWT Access + Refresh Tokens]
-		C --> D[GET /events and /events/{id}]
-		D --> E[POST /api/queue/join]
-
-		E --> F{Queue Decision}
-		F -->|NO_QUEUE| G[Generate Direct Booking Token]
-		F -->|SOFT_QUEUE / HARD_QUEUE| H[Join Virtual Queue]
-		H --> I[GET /api/queue/position]
-		I --> J[Receive Queue Token]
-
-		G --> K[POST /api/reservations]
-		J --> K
-		K --> L[Seats Reserved Temporarily]
-		L --> M[POST /api/bookings/confirm + Idempotency-Key]
-		M --> N[Payment + Booking Confirmation]
-		N --> O[Queue Token Invalidated]
-		O --> P[Booking Response]
-
-		subgraph Storage
-			Q[(MySQL)]
-			R[(Redis)]
-		end
-
-		K --> Q
-		M --> Q
-		E --> R
-		I --> R
-```
 
 ## Core API Endpoints
 
