@@ -3,7 +3,8 @@
 TicketFlow is a Spring Boot backend for high-demand event ticket booking with JWT authentication, virtual queue control, seat reservation, and booking confirmation.
 
 ## Booking Flow Diagram
-<img width="1536" height="1024" alt="High-concurrency ticket booking flowchart" src="https://github.com/user-attachments/assets/b88a3225-5c27-4aac-a513-cfbb366fe61b" />
+<img width="1536" height="1024" alt="ChatGPT Image Apr 8, 2026, 03_20_14 PM" src="https://github.com/user-attachments/assets/7f77f5f1-dc13-49ee-adba-666d7d3c4626" />
+
 ## Features
 
 - User registration, login, refresh token flow
