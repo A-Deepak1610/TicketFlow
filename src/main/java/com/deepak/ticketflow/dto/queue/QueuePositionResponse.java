@@ -1,5 +1,6 @@
 package com.deepak.ticketflow.dto.queue;
 
+import com.deepak.ticketflow.Enum.UserType;
 import lombok.Builder;
 import lombok.Data;
 

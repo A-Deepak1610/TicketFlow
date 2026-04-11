@@ -5,7 +5,7 @@ import com.deepak.ticketflow.dto.queue.QueueJoinResponse;
 import com.deepak.ticketflow.dto.queue.QueuePositionResponse;
 import com.deepak.ticketflow.dto.queue.QueueDecision;
 import com.deepak.ticketflow.filters.CustomUserPrincipal;
-import com.deepak.ticketflow.model.queue.UserType;
+import com.deepak.ticketflow.Enum.UserType;
 import com.deepak.ticketflow.service.queue.QueueDecisionService;
 import com.deepak.ticketflow.service.queue.VirtualQueueService;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +41,7 @@ public class QueueController {
         if (decision == QueueDecision.NO_QUEUE) {
             // Direct booking mode - generate immediate token
             String token = queueService.generateBookingToken(
+                request.getEventId(),
                     request.getUserId(),
                     request.getUserType(),
                     5  // 5 minutes expiry

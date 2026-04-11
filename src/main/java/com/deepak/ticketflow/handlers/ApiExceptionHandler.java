@@ -34,7 +34,7 @@ public class ApiExceptionHandler {
     @ExceptionHandler({SeatLockException.class, PaymentFailedException.class})
     public ResponseEntity<ErrorResponse> handleBusinessFailure(RuntimeException ex,
                                                                HttpServletRequest request) {
-        return build(HttpStatus.UNPROCESSABLE_CONTENT, ex.getMessage(), request);
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request);
     }
 
     @ExceptionHandler(Exception.class)

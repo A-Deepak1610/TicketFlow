@@ -1,7 +1,7 @@
 package com.deepak.ticketflow.service.queue;
 
 import com.deepak.ticketflow.config.QueueConfiguration;
-import com.deepak.ticketflow.model.queue.UserType;
+import com.deepak.ticketflow.Enum.UserType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -69,17 +69,14 @@ public class QueueProcessor {
     }
 
     private void processUser(String queueEntry, UserType userType) {
-        String[] parts = queueEntry.split(":");
+        String[] parts = queueEntry.split(":", 2);
         Long eventId = Long.parseLong(parts[0]);
         Integer userId = Integer.parseInt(parts[1]);
 
         int expiryMinutes = userType == UserType.VIP ? 5 : 2;
 
         // Generate booking token
-        String token = queueService.generateBookingToken(userId, userType, expiryMinutes);
-
-        // Remove from queue
-        queueService.removeFromQueue(eventId, userId, userType);
+        String token = queueService.generateBookingToken(eventId, userId, userType, expiryMinutes);
 
         log.info("User {} ({}) is ready to book with token {}", userId, userType, token);
 

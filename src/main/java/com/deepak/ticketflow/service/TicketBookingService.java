@@ -36,6 +36,7 @@ import com.deepak.ticketflow.repository.BookingSeatRepository;
 import com.deepak.ticketflow.repository.EventRepository;
 import com.deepak.ticketflow.repository.ReservationRepository;
 import com.deepak.ticketflow.repository.SeatRepository;
+import com.deepak.ticketflow.service.queue.VirtualQueueService;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -51,6 +52,7 @@ public class TicketBookingService {
     @Autowired private EventRepository       eventRepository;
     @Autowired private RedisLockService      redisLockService;
     @Autowired private PaymentService        paymentService;
+    @Autowired private VirtualQueueService   queueService;
     @Transactional
     public ReservationResponse reserveSeats(Long eventId,
                                             List<String> seatNumbers,
@@ -66,7 +68,6 @@ public class TicketBookingService {
                     .plusMinutes(RESERVATION_TIMEOUT_MINUTES);
 
             List<Reservation> reservations = new ArrayList<>();
-
             for (String seatNumber : seatNumbers) {
                 // Fetch with optimistic lock (@Version on Seat)
                 Seat seat = seatRepository
@@ -108,7 +109,8 @@ public class TicketBookingService {
     @Transactional
     public BookingResponse confirmBooking(List<Long> reservationIds,
                                           PaymentRequest paymentRequest,
-                                          String idempotencyKey) {
+                                          String idempotencyKey,
+                                          String queueToken) {
 
         if (reservationIds == null || reservationIds.isEmpty()) {
             throw new InvalidReservationException("At least one reservation ID required");
@@ -116,18 +118,19 @@ public class TicketBookingService {
 
         // Idempotency check — if we already processed this key, return existing booking
         return bookingRepository.findByIdempotencyKey(idempotencyKey)
-                .map(existing -> {
-                    log.info("Idempotent replay — returning existing booking {}",
-                            existing.getBookingReference());
-                    return new BookingResponse(existing);
-                })
-                .orElseGet(() -> processNewMultiSeatBooking(
-                        reservationIds, paymentRequest, idempotencyKey));
+            .map(existing -> {
+                log.info("Idempotent replay — returning existing booking {}",
+                    existing.getBookingReference());
+                return new BookingResponse(existing);
+            })
+            .orElseGet(() -> processNewMultiSeatBooking(
+                reservationIds, paymentRequest, idempotencyKey, queueToken));
     }
 
     private BookingResponse processNewMultiSeatBooking(List<Long> reservationIds,
                                                         PaymentRequest paymentRequest,
-                                                        String idempotencyKey) {
+                                String idempotencyKey,
+                                String queueToken) {
         LocalDateTime now = LocalDateTime.now();
         List<Reservation> reservations = new ArrayList<>();
         List<Seat> seats = new ArrayList<>();
@@ -184,6 +187,14 @@ public class TicketBookingService {
         log.info("Validated {} reservations for user {}, total amount: {}",
                 reservationIds.size(), userId, totalAmount);
 
+        if (queueToken == null || queueToken.isBlank()) {
+            throw new InvalidReservationException("Queue token required");
+        }
+
+        if (!queueService.validateToken(queueToken, eventId, userId)) {
+            throw new InvalidReservationException("Invalid or expired queue token");
+        }
+
         // ─── STEP 2: Process payment (single payment for all seats)
         //      If this fails, everything rolls back
         PaymentResponse payment = paymentService.processPayment(paymentRequest);
@@ -230,6 +241,8 @@ public class TicketBookingService {
 
         // ─── STEP 7: Decrement available seat count
         updateAvailableSeats(eventId, -seats.size());
+
+        queueService.invalidateToken(queueToken, eventId, userId);
 
         log.info("Booking confirmed: {} for user {} ({} seats)",
                 booking.getBookingReference(), userId, seats.size());

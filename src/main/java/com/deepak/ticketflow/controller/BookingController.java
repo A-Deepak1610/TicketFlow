@@ -48,7 +48,7 @@ public class BookingController{
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
         }
 
-        if (!queueService.validateToken(queueToken, userId)) {
+        if (!queueService.validateToken(queueToken, request.getEventId(), userId)) {
             Map<String, String> error = new HashMap<>();
             error.put("error", "Invalid or expired queue token");
             error.put("message", "Please rejoin the queue");
@@ -79,8 +79,6 @@ public class BookingController{
                                               @RequestHeader(value = "X-Queue-Token", required = false) String queueToken,  // ← ADD THIS PARAMETER
                                               @AuthenticationPrincipal CustomUserPrincipal principal) {
 
-        Integer userId = principal.getUserId();
-
         // ← START: ADD QUEUE VALIDATION
         // Validate queue token
         if (queueToken == null || queueToken.isEmpty()) {
@@ -89,27 +87,15 @@ public class BookingController{
             error.put("message", "Please join the queue first");
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
         }
-
-        if (!queueService.validateToken(queueToken, userId)) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", "Invalid or expired queue token");
-            error.put("message", "Please rejoin the queue");
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
-        }
-        // ← END: ADD QUEUE VALIDATION
+        // Queue token validation is performed inside the booking service because
+        // the event/user pair is derived from the reservation IDs.
 
         BookingResponse response = ticketBookingService.confirmBooking(
                 request.getReservationIds(),
                 request.getPaymentRequest(),
-                idempotencyKey
+                idempotencyKey,
+                queueToken
         );
-
-        // ← START: ADD TOKEN INVALIDATION ON SUCCESS
-        // Invalidate the queue token after successful booking
-        if (response.isSuccess() && queueToken != null) {
-            queueService.invalidateToken(queueToken, userId);
-        }
-        // ← END: ADD TOKEN INVALIDATION ON SUCCESS
 
         return ResponseEntity.ok(response);
     }
