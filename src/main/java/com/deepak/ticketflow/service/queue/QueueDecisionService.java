@@ -105,7 +105,7 @@ public class QueueDecisionService {
 
         // Check sticky decision
         String cacheKey = eventId + ":" + userId;
-        QueueDecision cached = decisionCache.getIfPresent(cacheKey);
+        QueueDecision cached = decisionCache.getIfPresent(cacheKey); //we use Caffeine for "If we already decided for this user, don’t recompute — just reuse it"
         if (cached != null) {
             recordDecision(cached);
             return cached;
@@ -195,18 +195,18 @@ public class QueueDecisionService {
     private double getRequestRateFactor() {
         int windowSeconds = Math.max(1, queueConfig.getLoad().getRpsWindowSeconds());
         int shards = Math.max(1, queueConfig.getLoad().getRpsShards());
+        //this will seconds from 1st jan 1970 till now
         long currentSecond = System.currentTimeMillis() / 1000;
 
         long totalRequests = 0;
         for (int secondOffset = 0; secondOffset < windowSeconds; secondOffset++) {
             long second = currentSecond - secondOffset;
             for (int shard = 0; shard < shards; shard++) {
-                String shardKey = RPS_KEY_PREFIX + second + ":" + shard;
+                String shardKey = RPS_KEY_PREFIX + second + ":" + shard;//Each second is split into 10 shards to avoid hot key problem in redis
                 String count = redis.opsForValue().get(shardKey);
                 totalRequests += parseLong(count);
             }
         }
-
         double averageRps = (double) totalRequests / windowSeconds;
         long maxRps = Math.max(1, queueConfig.getLoad().getMaxRps());
         return Math.min(1.0, averageRps / maxRps);
@@ -225,10 +225,10 @@ public class QueueDecisionService {
 
         redis.opsForHyperLogLog().add(ACTIVE_USERS_HLL_KEY, userId.toString());
         redis.expire(ACTIVE_USERS_HLL_KEY, Duration.ofSeconds(Math.max(1, queueConfig.getLoad().getActiveUsersTtlSeconds())));
-
+        //we are extending the ttl it will expire when there is no request for 10sec
         long second = System.currentTimeMillis() / 1000;
         int shard = getShardForUser(userId);
-        String shardKey = RPS_KEY_PREFIX + second + ":" + shard;
+        String shardKey = RPS_KEY_PREFIX + second + ":" + shard; //to prevent redis hot key problems
 
         redis.execute(
                 INCR_WITH_EXPIRE_SCRIPT,
