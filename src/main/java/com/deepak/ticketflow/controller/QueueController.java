@@ -25,16 +25,11 @@ public class QueueController {
     public ResponseEntity<QueueJoinResponse> joinQueue(
             @RequestBody QueueJoinRequest request,
             @AuthenticationPrincipal CustomUserPrincipal principal) {
-
-        // Verify user matches
-        if (!request.getUserId().equals(principal.getUserId())) {
-            return ResponseEntity.status(403).build();
-        }
-
+//        request.setUserId(principal.getUserId());
         // Determine if queue is needed
         QueueDecision decision = decisionService.decide(
                 request.getEventId(),
-                request.getUserId(),
+                principal.getUserId(),
                 request.getUserType()
         );
 
