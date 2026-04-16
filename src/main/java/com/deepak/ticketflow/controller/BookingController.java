@@ -32,9 +32,9 @@ public class BookingController{
     private VirtualQueueService queueService;  // ← ADD THIS
 
     @PostMapping("/reservations")
-    public ResponseEntity<?> reserveSeats(  // ← CHANGE ResponseEntity<ReservationResponse> to ResponseEntity<?>
+    public ResponseEntity<?> reserveSeats(
                                             @RequestBody ReservationRequest request,
-                                            @RequestHeader(value = "X-Queue-Token", required = false) String queueToken,  // ← ADD THIS PARAMETER
+                                            @RequestHeader(value = "X-Queue-Token", required = false) String queueToken,
                                             @AuthenticationPrincipal CustomUserPrincipal principal) {
 
         Integer userId = principal.getUserId();

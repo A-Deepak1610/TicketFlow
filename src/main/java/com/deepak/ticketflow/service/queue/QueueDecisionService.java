@@ -83,6 +83,7 @@ public class QueueDecisionService {
 
     @Scheduled(fixedRate = 500) // Calculate every 500ms
     public void refreshLoadFactor() {
+        System.out.println("Cached load factor: " + cachedLoadFactor);
         try {
             this.cachedLoadFactor = calculateLoadFactor();
             this.cachedLoadFactorBasisPoints.set((long) (this.cachedLoadFactor * 10_000));
@@ -213,9 +214,36 @@ public class QueueDecisionService {
     }
 
     private double getDatabasePressureFactor() {
-        // Simplified - in production, use HikariCP metrics
-        // For now, return moderate value
-        return 0.5;
+        try {
+            Double active = meterRegistry
+                    .find("hikaricp.connections.active")
+                    .gauge()
+                    .value();
+
+            Double max = meterRegistry
+                    .find("hikaricp.connections.max")
+                    .gauge()
+                    .value();
+
+            Double pending = meterRegistry
+                    .find("hikaricp.connections.pending")
+                    .gauge()
+                    .value();
+
+            if (active == null || max == null || max == 0) {
+                return 0.5; // fallback
+            }
+            // Base pressure: how full the pool is
+            double usageFactor = active / max;
+            // Extra pressure: waiting threads
+            double pendingFactor = (pending != null ? pending : 0) / max;
+            // Combine (weighted)
+            double pressure = (usageFactor * 0.7) + (pendingFactor * 0.3);
+            return Math.min(1.0, pressure);
+        } catch (Exception e) {
+            log.warn("Failed to read DB metrics, using fallback");
+            return 0.5;
+        }
     }
 
     private void recordUserSignal(Integer userId) {
