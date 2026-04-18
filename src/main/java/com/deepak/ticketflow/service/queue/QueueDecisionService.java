@@ -30,7 +30,8 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class QueueDecisionService {
 
-    private static final String ACTIVE_USERS_HLL_KEY = "active:users";
+    private static final String ACTIVE_USERS_HLL_PREFIX = "active:users";
+    private static final int ACTIVE_USERS_WINDOW_SECONDS = 10;
     private static final String RPS_KEY_PREFIX = "rps:";
     private static final DefaultRedisScript<Long> INCR_WITH_EXPIRE_SCRIPT = new DefaultRedisScript<>(
             "local current = redis.call('INCR', KEYS[1]) " +
@@ -83,7 +84,7 @@ public class QueueDecisionService {
 
     @Scheduled(fixedRate = 500) // Calculate every 500ms
     public void refreshLoadFactor() {
-        System.out.println("Cached load factor: " + cachedLoadFactor);
+        log.debug("Refreshed load factor calculation cycle");
         try {
             this.cachedLoadFactor = calculateLoadFactor();
             this.cachedLoadFactorBasisPoints.set((long) (this.cachedLoadFactor * 10_000));
@@ -183,7 +184,12 @@ public class QueueDecisionService {
     }
 
     private double getSessionLoadFactor() {
-        Long activeUsers = redis.opsForHyperLogLog().size(ACTIVE_USERS_HLL_KEY);
+        // Get active users from current fixed time window
+        long currentSecond = System.currentTimeMillis() / 1000;
+        long window = currentSecond / ACTIVE_USERS_WINDOW_SECONDS;
+        String windowKey = ACTIVE_USERS_HLL_PREFIX + ":" + window;
+        
+        Long activeUsers = redis.opsForHyperLogLog().size(windowKey);
 
         if (activeUsers != null) {
             cachedActiveUsers.set(activeUsers);
@@ -215,20 +221,23 @@ public class QueueDecisionService {
 
     private double getDatabasePressureFactor() {
         try {
-            Double active = meterRegistry
+            io.micrometer.core.instrument.Gauge activeGauge = meterRegistry
                     .find("hikaricp.connections.active")
-                    .gauge()
-                    .value();
-
-            Double max = meterRegistry
+                    .gauge();
+            io.micrometer.core.instrument.Gauge maxGauge = meterRegistry
                     .find("hikaricp.connections.max")
-                    .gauge()
-                    .value();
-
-            Double pending = meterRegistry
+                    .gauge();
+            io.micrometer.core.instrument.Gauge pendingGauge = meterRegistry
                     .find("hikaricp.connections.pending")
-                    .gauge()
-                    .value();
+                    .gauge();
+
+            if (activeGauge == null || maxGauge == null) {
+                return 0.5; // fallback
+            }
+
+            Double active = activeGauge.value();
+            Double max = maxGauge.value();
+            Double pending = pendingGauge != null ? pendingGauge.value() : null;
 
             if (active == null || max == null || max == 0) {
                 return 0.5; // fallback
@@ -251,12 +260,19 @@ public class QueueDecisionService {
             return;
         }
 
-        redis.opsForHyperLogLog().add(ACTIVE_USERS_HLL_KEY, userId.toString());
-        redis.expire(ACTIVE_USERS_HLL_KEY, Duration.ofSeconds(Math.max(1, queueConfig.getLoad().getActiveUsersTtlSeconds())));
-        //we are extending the ttl it will expire when there is no request for 10sec
-        long second = System.currentTimeMillis() / 1000;
+        // Use fixed time window instead of continuously extending TTL
+        long currentSecond = System.currentTimeMillis() / 1000;
+        long window = currentSecond / ACTIVE_USERS_WINDOW_SECONDS;
+        String windowKey = ACTIVE_USERS_HLL_PREFIX + ":" + window;
+        
+        redis.opsForHyperLogLog().add(windowKey, userId.toString());
+        // Set expiration to 2x window size to keep previous window data available
+        redis.expire(windowKey, Duration.ofSeconds(ACTIVE_USERS_WINDOW_SECONDS * 2));
+        
+        // Record RPS with sharding to prevent hot keys
+        long second = currentSecond;
         int shard = getShardForUser(userId);
-        String shardKey = RPS_KEY_PREFIX + second + ":" + shard; //to prevent redis hot key problems
+        String shardKey = RPS_KEY_PREFIX + second + ":" + shard;
 
         redis.execute(
                 INCR_WITH_EXPIRE_SCRIPT,
