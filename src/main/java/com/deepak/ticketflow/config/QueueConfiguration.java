@@ -46,8 +46,8 @@ public class QueueConfiguration {
 
     @Data
     public static class Load {
-        private long maxConcurrentUsers = 10000;
-        private long maxRps = 500;
+        private long maxConcurrentUsers = 1000;
+        private long maxRps = 50;
         private int activeUsersTtlSeconds = 10;
         private int rpsCounterTtlSeconds = 2;
         private int rpsShards = 10;
