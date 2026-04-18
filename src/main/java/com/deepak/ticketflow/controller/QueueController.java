@@ -25,7 +25,7 @@ public class QueueController {
     public ResponseEntity<QueueJoinResponse> joinQueue(
             @RequestBody QueueJoinRequest request,
             @AuthenticationPrincipal CustomUserPrincipal principal) {
-//        request.setUserId(principal.getUserId());
+        request.setUserId(principal.getUserId());
         // Determine if queue is needed
         QueueDecision decision = decisionService.decide(
                 request.getEventId(),
@@ -37,7 +37,7 @@ public class QueueController {
             // Direct booking mode - generate immediate token
             String token = queueService.generateBookingToken(
                 request.getEventId(),
-                    request.getUserId(),
+                    principal.getUserId(),
                     request.getUserType(),
                     5  // 5 minutes expiry
             );

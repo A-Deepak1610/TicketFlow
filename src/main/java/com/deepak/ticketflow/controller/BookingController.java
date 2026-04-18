@@ -38,7 +38,6 @@ public class BookingController{
                                             @AuthenticationPrincipal CustomUserPrincipal principal) {
 
         Integer userId = principal.getUserId();
-
         // ← START: ADD QUEUE VALIDATION
         // Validate queue token if present
         if (queueToken == null || queueToken.isEmpty()) {

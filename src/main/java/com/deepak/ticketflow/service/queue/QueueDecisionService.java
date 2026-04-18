@@ -83,7 +83,7 @@ public class QueueDecisionService {
 
     @Scheduled(fixedRate = 500) // Calculate every 500ms
     public void refreshLoadFactor() {
-        System.out.println("Cached load factor: " + cachedLoadFactor);
+        log.debug("Refreshed load factor calculation cycle");
         try {
             this.cachedLoadFactor = calculateLoadFactor();
             this.cachedLoadFactorBasisPoints.set((long) (this.cachedLoadFactor * 10_000));
@@ -215,20 +215,23 @@ public class QueueDecisionService {
 
     private double getDatabasePressureFactor() {
         try {
-            Double active = meterRegistry
+            io.micrometer.core.instrument.Gauge activeGauge = meterRegistry
                     .find("hikaricp.connections.active")
-                    .gauge()
-                    .value();
-
-            Double max = meterRegistry
+                    .gauge();
+            io.micrometer.core.instrument.Gauge maxGauge = meterRegistry
                     .find("hikaricp.connections.max")
-                    .gauge()
-                    .value();
-
-            Double pending = meterRegistry
+                    .gauge();
+            io.micrometer.core.instrument.Gauge pendingGauge = meterRegistry
                     .find("hikaricp.connections.pending")
-                    .gauge()
-                    .value();
+                    .gauge();
+
+            if (activeGauge == null || maxGauge == null) {
+                return 0.5; // fallback
+            }
+
+            Double active = activeGauge.value();
+            Double max = maxGauge.value();
+            Double pending = pendingGauge != null ? pendingGauge.value() : null;
 
             if (active == null || max == null || max == 0) {
                 return 0.5; // fallback
