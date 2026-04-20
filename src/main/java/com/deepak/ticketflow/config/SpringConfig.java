@@ -1,8 +1,8 @@
 package com.deepak.ticketflow.config;
-
+import com.deepak.ticketflow.filters.ApiMetricsFilter;
 import com.deepak.ticketflow.filters.JwtFilter;
+
 import com.deepak.ticketflow.handlers.CustomAccessDeniedHandler;
-import io.jsonwebtoken.Jwt;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -23,13 +23,15 @@ public class SpringConfig {
     @Autowired
     private AuthenticationProvider customAuthProvider;
     @Autowired
-    JwtFilter jwtFilter;
+    JwtFilter  jwtFilter;
     @Autowired
-    CustomAccessDeniedHandler  customAccessDeniedHandler;
+    ApiMetricsFilter apiMetricsFilter;
+    @Autowired
+    CustomAccessDeniedHandler customAccessDeniedHandler;
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http.csrf(csrf->csrf.disable())
-                .authorizeHttpRequests(auth -> auth.requestMatchers("/login", "/register","/refresh","/events","/events/*","/").permitAll()
+                .authorizeHttpRequests(auth -> auth.requestMatchers("/login", "/register","/refresh","/events","/events/*","/actuator/prometheus","/").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session->session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
