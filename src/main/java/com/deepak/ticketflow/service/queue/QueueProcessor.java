@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 @RequiredArgsConstructor
 @Slf4j
 public class QueueProcessor {
-
+    private final QueueNotificationService queueNotificationService;
     private final StringRedisTemplate redis;
     private final VirtualQueueService queueService;
     private final QueueConfiguration queueConfig;
@@ -74,17 +74,15 @@ public class QueueProcessor {
         Long eventId = Long.parseLong(parts[0]);
         Integer userId = Integer.parseInt(parts[1]);
 
-        int expiryMinutes = userType == UserType.VIP ? 5 : 2;
+        int expiryMinutes = userType == UserType.VIP ? 5 : 5;
 
         // Generate booking token
         String token = queueService.generateBookingToken(eventId, userId, userType, expiryMinutes);
 
         log.info("User {} ({}) is ready to book with token {}", userId, userType, token);
-
-        // TODO: Send notification via WebSocket/SSE
+        queueNotificationService.sendBookingWindow(userId,token,expiryMinutes);
         // notifyUser(userId, token, expiryMinutes);
     }
-
     private void adaptProcessingRates() {
         // Monitor success rate - simplified version
         // In production, track actual booking success rate
