@@ -8,6 +8,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -32,6 +34,8 @@ public class QueueProcessor {
             return;
         }
 
+        Set<Long> updatedEvents = new HashSet<>();
+
         // Add jitter to prevent thundering herd
         // Because to avoid  Thundering Herd Problem.
         int jitter = ThreadLocalRandom.current().nextInt(0, 100);
@@ -47,7 +51,8 @@ public class QueueProcessor {
             String queueEntry = redis.opsForList().leftPop(VIP_QUEUE);
             if (queueEntry == null) break;
 
-            processUser(queueEntry, UserType.VIP);
+            Long eventId = processUser(queueEntry, UserType.VIP);
+            updatedEvents.add(eventId);
             vipProcessed++;
         }
 
@@ -57,7 +62,8 @@ public class QueueProcessor {
             String queueEntry = redis.opsForList().leftPop(NORMAL_QUEUE);
             if (queueEntry == null) break;
 
-            processUser(queueEntry, UserType.NORMAL);
+            Long eventId = processUser(queueEntry, UserType.NORMAL);
+            updatedEvents.add(eventId);
             normalProcessed++;
         }
 
@@ -65,11 +71,14 @@ public class QueueProcessor {
             log.debug("Processed {} VIP and {} normal users", vipProcessed, normalProcessed);
         }
 
+        for (Long eventId : updatedEvents) {
+            queueNotificationService.updateQueuePositions(eventId);
+        }
         // Adapt rates based on system health
         adaptProcessingRates();
     }
 
-    private void processUser(String queueEntry, UserType userType) {
+    private Long processUser(String queueEntry, UserType userType) {
         String[] parts = queueEntry.split(":", 2);
         Long eventId = Long.parseLong(parts[0]);
         Integer userId = Integer.parseInt(parts[1]);
@@ -81,7 +90,10 @@ public class QueueProcessor {
 
         log.info("User {} ({}) is ready to book with token {}", userId, userType, token);
         queueNotificationService.sendBookingWindow(userId,token,expiryMinutes);
+
         // notifyUser(userId, token, expiryMinutes);
+
+        return eventId;
     }
     private void adaptProcessingRates() {
         // Monitor success rate - simplified version
