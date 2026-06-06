@@ -43,7 +43,7 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @Slf4j
 public class TicketBookingService {
-    private static final int  RESERVATION_TIMEOUT_MINUTES = 10;
+    private static final int  RESERVATION_TIMEOUT_MINUTES = 5;
     private static final Duration LOCK_TTL = Duration.ofSeconds(30);
     @Autowired private SeatRepository        seatRepository;
     @Autowired private BookingRepository     bookingRepository;
