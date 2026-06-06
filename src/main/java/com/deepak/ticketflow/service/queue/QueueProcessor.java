@@ -33,6 +33,7 @@ public class QueueProcessor {
         }
 
         // Add jitter to prevent thundering herd
+        // Because to avoid  Thundering Herd Problem.
         int jitter = ThreadLocalRandom.current().nextInt(0, 100);
         try {
             Thread.sleep(jitter);

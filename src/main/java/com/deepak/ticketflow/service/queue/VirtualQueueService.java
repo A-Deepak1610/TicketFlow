@@ -185,7 +185,7 @@ public class VirtualQueueService {
 
     private int calculateWaitTime(UserType userType, Long position) {
         // Improved: Use userType-based processing rates
-        int processingRate = userType == UserType.VIP ? 10 : 2;
+        int processingRate = userType == UserType.VIP ? 10 : 5;
         return (int) (position / processingRate);
     }
 }
