@@ -42,17 +42,17 @@ public class QueueAdmissionService {
         }
 
         // Check if there are available slots
-        int availableSlots = admissionControllerService.getAvailableSlots(eventId);
-        if (availableSlots <= 0) {
-            log.debug("No available slots for event {}, skipping admission", eventId);
-            return;
-        }
+        // int availableSlots = admissionControllerService.getAvailableSlots(eventId);
+        // if (availableSlots <= 0) {
+        //     log.debug("No available slots for event {}, skipping admission", eventId);
+        //     return;
+        // }
 
         // Try VIP queue first
         String vipQueueKey = getQueueKey(eventId, UserType.VIP);
         String queueEntry = redis.opsForList().leftPop(vipQueueKey);
         UserType userType = UserType.VIP;
-
+        
         if (queueEntry == null) {
             // Fall back to normal queue
             String normalQueueKey = getQueueKey(eventId, UserType.NORMAL);
