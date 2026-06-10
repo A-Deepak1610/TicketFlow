@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +38,7 @@ import com.deepak.ticketflow.repository.EventRepository;
 import com.deepak.ticketflow.repository.ReservationRepository;
 import com.deepak.ticketflow.repository.SeatRepository;
 import com.deepak.ticketflow.service.queue.VirtualQueueService;
+import com.deepak.ticketflow.event.BookingSlotFreedEvent;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -53,6 +55,7 @@ public class TicketBookingService {
     @Autowired private RedisLockService      redisLockService;
     @Autowired private PaymentService        paymentService;
     @Autowired private VirtualQueueService   queueService;
+    @Autowired private ApplicationEventPublisher applicationEventPublisher;
     @Transactional
     public ReservationResponse reserveSeats(Long eventId,
                                             List<String> seatNumbers,
@@ -244,8 +247,13 @@ public class TicketBookingService {
 
         queueService.invalidateToken(queueToken, eventId, userId);
 
-        log.info("Booking confirmed: {} for user {} ({} seats)",
-                booking.getBookingReference(), userId, seats.size());
+        // Publish event to trigger admission of next waiting user
+        applicationEventPublisher.publishEvent(
+                new BookingSlotFreedEvent(this, eventId)
+        );
+
+        log.info("Booking confirmed: {} for user {} ({} seats). Published BookingSlotFreedEvent for event {}",
+                booking.getBookingReference(), userId, seats.size(), eventId);
 
         return new BookingResponse(booking);
     }
@@ -338,5 +346,53 @@ public class TicketBookingService {
         } finally {
             redisLockService.release(lockKey, lockValue);
         }
+    }
+
+    /**
+     * Cancel a confirmed booking and free up the seats.
+     * 
+     * Publishes BookingSlotFreedEvent to trigger admission of next waiting users.
+     * 
+     * @param bookingId the booking ID to cancel
+     */
+    @Transactional
+    public void cancelBooking(Long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
+
+        if (booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw new RuntimeException("Only confirmed bookings can be cancelled");
+        }
+
+        Long eventId = booking.getEventId();
+        Integer userId = booking.getUserId();
+
+        // Get all seats for this booking
+        List<BookingSeat> bookingSeats = bookingSeatRepository.findByBookingId(bookingId);
+        
+        // Release all seats back to AVAILABLE
+        for (BookingSeat bookingSeat : bookingSeats) {
+            Seat seat = seatRepository.findById(bookingSeat.getSeatId())
+                    .orElseThrow(() -> new SeatNotFoundException("Seat not found"));
+            
+            seat.setStatus(SeatStatus.AVAILABLE);
+            seat.setBookingId(null);
+            seat.setReservedBy(null);
+            seat.setReservedUntil(null);
+            seatRepository.save(seat);
+        }
+
+        // Update booking status
+        booking.setStatus(BookingStatus.CANCELLED);
+        bookingRepository.save(booking);
+
+        // Increment available seats
+        updateAvailableSeats(eventId, bookingSeats.size());
+
+        log.info("Booking {} cancelled for user {}. Released {} seats", 
+                bookingId, userId, bookingSeats.size());
+
+        // Publish event to trigger admission of waiting users
+        applicationEventPublisher.publishEvent(new BookingSlotFreedEvent(this, eventId));
     }
 }
