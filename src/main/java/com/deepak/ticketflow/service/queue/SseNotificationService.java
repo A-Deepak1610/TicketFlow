@@ -14,20 +14,61 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
-public class QueueNotificationService {
+public class SseNotificationService {
     private final StringRedisTemplate redis;
     private final VirtualQueueService queueService;
     private final Map<Integer, SseEmitter> emitters = new ConcurrentHashMap<>();
+    private final Map<Integer, Long> userEvents = new ConcurrentHashMap<>();
 
-    public SseEmitter subscribe(Integer userId) {
-        SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);//forever connection
+    // public SseEmitter subscribe(Integer userId) {
+    //     return subscribe(userId, null);
+    // }
+
+    public SseEmitter subscribe(Integer userId, Long eventId) {
+        SseEmitter emitter = new SseEmitter(Long.MAX_VALUE); // forever connection
         emitters.put(userId, emitter);
-
-        emitter.onCompletion(() ->//close connection
-                emitters.remove(userId));
-        emitter.onTimeout(() ->
-                emitters.remove(userId));
+        if (eventId != null) {
+            userEvents.put(userId, eventId);
+        } else {
+            userEvents.remove(userId);
+        }
+        System.out.println(userId+"==================="+eventId);
+        emitter.onCompletion(() -> {
+            emitters.remove(userId);
+            userEvents.remove(userId);
+        });
+        emitter.onTimeout(() -> {
+            emitters.remove(userId);
+            userEvents.remove(userId);
+        });
         return emitter;
+    }
+
+    public void sendSeatStatusUpdate(Long eventId, String seatNumber, String status) {
+        if (eventId == null || seatNumber == null || status == null) {
+            return;
+        }
+        Map<String, Object> update = Map.of(
+                "type", "SEAT_STATUS_UPDATE",
+                "eventId", eventId,
+                "seatNumber", seatNumber,
+                "status", status
+        );
+
+        for (Map.Entry<Integer, Long> entry : userEvents.entrySet()) {
+            if (eventId.equals(entry.getValue())) {
+                Integer userId = entry.getKey();
+                SseEmitter emitter = emitters.get(userId);
+                if (emitter != null) {
+                    try {
+                        emitter.send(update);
+                    } catch (IOException e) {
+                        emitters.remove(userId);
+                        userEvents.remove(userId);
+                    }
+                }
+            }
+        }
     }
     public void sendPosition(Integer userId, QueuePositionResponse response) {
         SseEmitter emitter = emitters.get(userId);

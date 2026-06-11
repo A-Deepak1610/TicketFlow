@@ -38,6 +38,7 @@ import com.deepak.ticketflow.repository.EventRepository;
 import com.deepak.ticketflow.repository.ReservationRepository;
 import com.deepak.ticketflow.repository.SeatRepository;
 import com.deepak.ticketflow.service.queue.VirtualQueueService;
+import com.deepak.ticketflow.service.queue.SseNotificationService;
 import com.deepak.ticketflow.event.BookingSlotFreedEvent;
 
 import lombok.extern.slf4j.Slf4j;
@@ -55,6 +56,7 @@ public class TicketBookingService {
     @Autowired private RedisLockService      redisLockService;
     @Autowired private PaymentService        paymentService;
     @Autowired private VirtualQueueService   queueService;
+    @Autowired private SseNotificationService sseNotificationService;
     @Autowired private ApplicationEventPublisher applicationEventPublisher;
     @Transactional
     public ReservationResponse reserveSeats(Long eventId,
@@ -88,6 +90,9 @@ public class TicketBookingService {
                 seat.setReservedBy(userId);
                 seat.setReservedUntil(reservedUntil);
                 seatRepository.save(seat);  // @Version bumped here
+
+                // Broadcast update
+                sseNotificationService.sendSeatStatusUpdate(eventId, seatNumber, SeatStatus.RESERVED.name());
 
                 // Persist reservation record
                 Reservation reservation = new Reservation();
@@ -234,6 +239,7 @@ public class TicketBookingService {
             seat.setReservedBy(null);
             seat.setReservedUntil(null);
             seatRepository.save(seat);
+            sseNotificationService.sendSeatStatusUpdate(eventId, seat.getSeatNumber(), SeatStatus.BOOKED.name());
         }
 
         // ─── STEP 6: Update all reservations to CONFIRMED
@@ -335,6 +341,8 @@ public class TicketBookingService {
                 seat.setReservedUntil(null);
                 seatRepository.save(seat);
 
+                sseNotificationService.sendSeatStatusUpdate(reservation.getEventId(), seatNumber, SeatStatus.AVAILABLE.name());
+
                 reservation.setStatus(ReservationStatus.EXPIRED);
                 reservationRepository.save(reservation);
 
@@ -380,6 +388,7 @@ public class TicketBookingService {
             seat.setReservedBy(null);
             seat.setReservedUntil(null);
             seatRepository.save(seat);
+            sseNotificationService.sendSeatStatusUpdate(eventId, seat.getSeatNumber(), SeatStatus.AVAILABLE.name());
         }
 
         // Update booking status
