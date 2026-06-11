@@ -40,6 +40,7 @@ public class ApiExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception ex,
                                                           HttpServletRequest request) {
+        System.err.println(ex.getMessage());
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected server error", request);
     }
 

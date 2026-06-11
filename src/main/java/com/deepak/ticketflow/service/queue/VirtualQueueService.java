@@ -1,26 +1,30 @@
 package com.deepak.ticketflow.service.queue;
 
-import com.deepak.ticketflow.dto.queue.QueueJoinResponse;
-import com.deepak.ticketflow.dto.queue.QueuePositionResponse;
-import com.deepak.ticketflow.Enum.UserType;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.stereotype.Service;
-
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Service;
+
+import com.deepak.ticketflow.Enum.UserType;
+import com.deepak.ticketflow.dto.queue.QueueJoinResponse;
+import com.deepak.ticketflow.dto.queue.QueuePositionResponse;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class VirtualQueueService {
 
-    private final StringRedisTemplate redis;
-
     private static final String TOKEN_PREFIX = "queue:token:";
+    private static final String QUEUE_EVENTS_KEY = "queue:events";
+
+    private final StringRedisTemplate redis;
+    private final AdmissionControllerService admissionControllerService;
 
     private String getQueueKey(Long eventId, UserType userType) {
         return "queue:" + eventId + ":" + userType.name().toLowerCase();
@@ -62,6 +66,7 @@ public class VirtualQueueService {
         }
 
         Long position = redis.opsForList().rightPush(queueKey, queueValue);
+        redis.opsForSet().add(QUEUE_EVENTS_KEY, eventId.toString());
         log.info("User {} ({}) joined queue at position {}", userId, userType, position);
 
         // Calculate estimated wait time
@@ -138,21 +143,22 @@ public class VirtualQueueService {
      * Generate booking token when user reaches front of queue
      */
     public String generateBookingToken(Long eventId, Integer userId, UserType userType, int expiryMinutes) {
-        String token = UUID.randomUUID().toString();
         String tokenKey = buildTokenKey(eventId, userId);
         Duration expiry = Duration.ofMinutes(expiryMinutes);
+        String token = UUID.randomUUID().toString();
 
-        // Use setIfAbsent to prevent token overwrite (atomic operation)
         Boolean success = redis.opsForValue().setIfAbsent(tokenKey, token, expiry);
         if (Boolean.FALSE.equals(success)) {
-            // Token already exists, return existing token
             String existingToken = redis.opsForValue().get(tokenKey);
-            log.info("Token already exists for user {} ({}), returning existing token", userId, userType);
-            return existingToken;
+            if (existingToken != null) {
+                admissionControllerService.registerActiveBooking(eventId, userId);
+                log.info("Token already exists for user {} ({}), returning existing token", userId, userType);
+                return existingToken;
+            }
         }
 
         redis.opsForValue().set("token:" + token, eventId + ":" + userId, expiry);
-
+        admissionControllerService.registerActiveBooking(eventId, userId);
         log.info("Generated booking token for user {} ({}), expires in {} minutes",
                 userId, userType, expiryMinutes);
         return token;
@@ -170,6 +176,7 @@ public class VirtualQueueService {
      * Invalidate token after booking
      */
     public void invalidateToken(String token, Long eventId, Integer userId) {
+        admissionControllerService.releaseActiveBooking(eventId, userId);
         redis.delete("token:" + token);
         redis.delete(buildTokenKey(eventId, userId));
     }
