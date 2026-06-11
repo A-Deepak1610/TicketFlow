@@ -20,9 +20,9 @@ public class SseNotificationService {
     private final Map<Integer, SseEmitter> emitters = new ConcurrentHashMap<>();
     private final Map<Integer, Long> userEvents = new ConcurrentHashMap<>();
 
-    public SseEmitter subscribe(Integer userId) {
-        return subscribe(userId, null);
-    }
+    // public SseEmitter subscribe(Integer userId) {
+    //     return subscribe(userId, null);
+    // }
 
     public SseEmitter subscribe(Integer userId, Long eventId) {
         SseEmitter emitter = new SseEmitter(Long.MAX_VALUE); // forever connection
@@ -32,7 +32,7 @@ public class SseNotificationService {
         } else {
             userEvents.remove(userId);
         }
-
+        System.out.println(userId+"==================="+eventId);
         emitter.onCompletion(() -> {
             emitters.remove(userId);
             userEvents.remove(userId);

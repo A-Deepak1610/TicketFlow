@@ -28,7 +28,7 @@ public class QueueStreamController {
             @AuthenticationPrincipal CustomUserPrincipal principal) {
         System.out.println("=========================CONNECTED==========================");
 
-        return notificationService.subscribe(
+        return notificationService.subscribe(  
                 principal.getUserId(), eventId);
     }
     @GetMapping("/test")
