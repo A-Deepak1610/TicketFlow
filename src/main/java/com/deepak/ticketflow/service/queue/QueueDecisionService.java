@@ -137,6 +137,16 @@ public class QueueDecisionService {
             return hardQueue;
         }
 
+        // If there are already people in the queue, force queue regardless of system load factors
+        if (hasPeopleInQueue(eventId)) {
+            QueueDecision decision = (cachedLoadFactor < queueConfig.getThresholds().getHardQueue())
+                    ? QueueDecision.SOFT_QUEUE
+                    : QueueDecision.HARD_QUEUE;
+            decisionCache.put(cacheKey, decision);
+            recordDecision(decision);
+            return decision;
+        }
+
         // Auto mode - use load factor
         QueueDecision decision;
         if (cachedLoadFactor < queueConfig.getThresholds().getSoftQueue()) {
@@ -312,6 +322,22 @@ public class QueueDecisionService {
         queueDecisionCounter.increment();
         meterRegistry.counter("queue.decision.by_type", Tags.of("decision", decision.name())).increment();
         log.info("LoadFactor={}, Decision={}", cachedLoadFactor, decision);
+    }
+
+    private boolean hasPeopleInQueue(Long eventId) {
+        if (eventId == null) {
+            return false;
+        }
+        try {
+            String vipKey = "queue:" + eventId + ":vip";
+            String normalKey = "queue:" + eventId + ":normal";
+            Long vipSize = redis.opsForList().size(vipKey);
+            Long normalSize = redis.opsForList().size(normalKey);
+            return (vipSize != null && vipSize > 0) || (normalSize != null && normalSize > 0);
+        } catch (Exception e) {
+            log.error("Failed to check queue sizes in Redis", e);
+            return false;
+        }
     }
 
     public void clearDecisionForUser(Long eventId, Integer userId) {
