@@ -15,7 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 @Slf4j
 public class QueueProcessor {
-    private final QueueNotificationService queueNotificationService;
+    private final SseNotificationService sseNotificationService;
     private final StringRedisTemplate redis;
     private final VirtualQueueService queueService;
     private final QueueConfiguration queueConfig;

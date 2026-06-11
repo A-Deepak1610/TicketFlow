@@ -26,7 +26,7 @@ public class QueueAdmissionService {
 
     private final StringRedisTemplate redis;
     private final VirtualQueueService queueService;
-    private final QueueNotificationService queueNotificationService;
+    private final SseNotificationService sseNotificationService;
     private final AdmissionControllerService admissionControllerService;
 
     /**
@@ -85,7 +85,7 @@ public class QueueAdmissionService {
             String token = queueService.generateBookingToken(eventId, userId, userType, 5);
 
             // Notify user via SSE that their booking window is open
-            queueNotificationService.sendBookingWindow(userId, token, 5);
+            sseNotificationService.sendBookingWindow(userId, token, 5);
 
             log.info("Admitted user {} ({}) from queue for event {} with token", 
                     userId, userType, eventId);
