@@ -26,9 +26,9 @@ public class RabbitMQConfig {
 
     @Bean
     public Queue emailQueue() {
-        return QueueBuilder.durable(emailQueue)
-                .withArgument("x-dead-letter-exchange", emailExchange + ".dlx")
-                .withArgument("x-dead-letter-routing-key", emailRoutingKey + ".dead")
+        return QueueBuilder.durable(emailQueue)//A queue stores messages until the consumer processes them.
+                .withArgument("x-dead-letter-exchange", emailExchange + ".dlx")//will receive failed messages.
+                .withArgument("x-dead-letter-routing-key", emailRoutingKey + ".dead")//The specific routing key used when sending a failed message to the DLX.
                 .withArgument("x-max-retries", 3)
                 .build();
     }

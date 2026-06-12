@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Booking Confirmation</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #4CAF50; color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; }
+        .seats { background-color: #f5f5f5; padding: 15px; margin: 15px 0; }
+        .total { font-size: 18px; font-weight: bold; color: #4CAF50; }
+        .footer { text-align: center; font-size: 12px; color: #999; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Booking Confirmed!</h1>
+            <p>Reference: <strong th:text="${booking.bookingReference}"></strong></p>
+        </div>
+        
+        <div class="content">
+            <p>Dear <strong th:text="${booking.userName}"></strong>,</p>
+            <p>Your booking has been confirmed for:</p>
+            
+            <div class="event-details">
+                <h3>Event Details</h3>
+                <p><strong>Event:</strong> <span th:text="${booking.eventName}"></span></p>
+                <p><strong>Date & Time:</strong> <span th:text="${booking.eventDateTime}"></span></p>
+                <p><strong>Venue:</strong> <span th:text="${booking.venueName}"></span></p>
+            </div>
+            
+            <div class="seats">
+                <h3>Seat Details</h3>
+                <table style="width: 100%;">
+                    <tr th:each="seat : ${booking.seats}">
+                        <td>Seat <span th:text="${seat.seatNumber}"></span></td>
+                        <td>Section <span th:text="${seat.section}"></span></td>
+                        <td>$<span th:text="${seat.price}"></span></td>
+                    </tr>
+                </table>
+                <div class="total">
+                    Total Amount: $<span th:text="${booking.totalAmount}"></span>
+                </div>
+            </div>
+            
+            <p>Your e-tickets are attached below. Please present the QR code at the venue entrance.</p>
+            
+            <div th:if="${booking.qrCodeUrl}">
+                <img th:src="${booking.qrCodeUrl}" alt="QR Code" style="width: 200px;"/>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Thank you for choosing TicketFlow!</p>
+            <p>This is an automated message, please do not reply.</p>
+        </div>
+    </div>
+</body>
+</html>
