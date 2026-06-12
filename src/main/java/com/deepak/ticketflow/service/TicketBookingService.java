@@ -257,7 +257,8 @@ public class TicketBookingService {
         applicationEventPublisher.publishEvent(
                 new BookingSlotFreedEvent(this, eventId)
         );
-
+        //Notification Service-Email
+        
         log.info("Booking confirmed: {} for user {} ({} seats). Published BookingSlotFreedEvent for event {}",
                 booking.getBookingReference(), userId, seats.size(), eventId);
 
