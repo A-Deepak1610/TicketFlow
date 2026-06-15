@@ -39,7 +39,7 @@ public class QueueController {
                 request.getEventId(),
                     principal.getUserId(),
                     request.getUserType(),
-                    5  // 5 minutes expiry
+                    10 // 5 minutes expiry
             );
 
             return ResponseEntity.ok(QueueJoinResponse.builder()

@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking Confirmation – TicketFlow</title>
+    <style>
+        /* ── Reset ──────────────────────────────────── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #E8ECF4;
+            color: #1A2340;
+            -webkit-text-size-adjust: 100%;
+        }
+
+        /* ── Wrapper ─────────────────────────────────── */
+        .email-wrapper {
+            max-width: 620px;
+            margin: 40px auto;
+            padding: 0 16px 40px;
+        }
+
+        /* ── Brand Header ────────────────────────────── */
+        .brand-header {
+            background: linear-gradient(135deg, #0F1729 0%, #1B2D6B 100%);
+            border-radius: 16px 16px 0 0;
+            padding: 32px 40px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .brand-logo {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: #FFFFFF;
+        }
+        .brand-logo span {
+            color: #5B5FEF;
+        }
+        .brand-tagline {
+            font-size: 11px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #8B9DC0;
+            margin-top: 3px;
+        }
+        .confirmed-badge {
+            background: #5B5FEF;
+            color: #FFFFFF;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            padding: 6px 14px;
+            border-radius: 100px;
+        }
+
+        /* ── Hero Banner ─────────────────────────────── */
+        .hero-banner {
+            background: linear-gradient(135deg, #5B5FEF 0%, #3B3FA8 100%);
+            padding: 36px 40px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero-banner::before {
+            content: '';
+            position: absolute;
+            width: 300px; height: 300px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.04);
+            top: -120px; right: -80px;
+        }
+        .hero-banner::after {
+            content: '';
+            position: absolute;
+            width: 200px; height: 200px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.04);
+            bottom: -80px; left: -40px;
+        }
+        .hero-check {
+            width: 52px; height: 52px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-bottom: 14px;
+        }
+        .hero-title {
+            font-size: 28px;
+            font-weight: 800;
+            color: #FFFFFF;
+            letter-spacing: -0.5px;
+            line-height: 1.2;
+        }
+        .hero-subtitle {
+            font-size: 14px;
+            color: rgba(255,255,255,0.75);
+            margin-top: 8px;
+        }
+        .ref-pill {
+            display: inline-block;
+            background: rgba(255,255,255,0.12);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #FFFFFF;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            padding: 6px 18px;
+            border-radius: 100px;
+            margin-top: 16px;
+        }
+        .ref-pill-label {
+            color: rgba(255,255,255,0.6);
+            font-weight: 400;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            display: block;
+            margin-top: 6px;
+        }
+
+        /* ── Body Card ───────────────────────────────── */
+        .body-card {
+            background: #FFFFFF;
+            padding: 36px 40px;
+        }
+        .greeting {
+            font-size: 16px;
+            color: #4A5568;
+            line-height: 1.6;
+        }
+        .greeting strong {
+            color: #0F1729;
+        }
+
+        /* ── Section Label ───────────────────────────── */
+        .section-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 28px 0 16px;
+        }
+        .section-label-dot {
+            width: 8px; height: 8px;
+            background: #5B5FEF;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .section-label-text {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #8B9DC0;
+        }
+        .section-label-line {
+            flex: 1;
+            height: 1px;
+            background: #EDF0F7;
+        }
+
+        /* ── Event Details Grid ──────────────────────── */
+        .event-card {
+            background: #F7F9FF;
+            border: 1px solid #E4E9F5;
+            border-radius: 12px;
+            padding: 24px;
+        }
+        .event-name {
+            font-size: 20px;
+            font-weight: 800;
+            color: #0F1729;
+            letter-spacing: -0.3px;
+            margin-bottom: 16px;
+        }
+        .event-meta {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .meta-item {}
+        .meta-key {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: #8B9DC0;
+            margin-bottom: 4px;
+        }
+        .meta-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1A2340;
+            line-height: 1.4;
+        }
+        .meta-icon {
+            display: inline-block;
+            margin-right: 4px;
+        }
+
+        /* ── Seats Table ─────────────────────────────── */
+        .seats-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 4px;
+        }
+        .seats-table thead tr th {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: #8B9DC0;
+            padding: 0 0 10px;
+            text-align: left;
+            border-bottom: 1px solid #EDF0F7;
+        }
+        .seats-table thead tr th:last-child { text-align: right; }
+        .seats-table tbody tr td {
+            padding: 12px 0;
+            font-size: 14px;
+            color: #1A2340;
+            border-bottom: 1px solid #F2F4F8;
+        }
+        .seats-table tbody tr:last-child td { border-bottom: none; }
+        .seats-table tbody tr td:last-child {
+            text-align: right;
+            font-weight: 600;
+            color: #0F1729;
+        }
+        .seat-badge {
+            display: inline-block;
+            background: #EEF0FF;
+            color: #5B5FEF;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 6px;
+            letter-spacing: 0.3px;
+        }
+        .section-chip {
+            display: inline-block;
+            background: #F2F4F8;
+            color: #4A5568;
+            font-size: 12px;
+            padding: 3px 10px;
+            border-radius: 6px;
+            margin-left: 6px;
+        }
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #0F1729;
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin-top: 16px;
+        }
+        .total-label {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.6);
+        }
+        .total-amount {
+            font-size: 22px;
+            font-weight: 800;
+            color: #FFFFFF;
+            letter-spacing: -0.5px;
+        }
+        .total-amount .currency {
+            font-size: 14px;
+            font-weight: 600;
+            vertical-align: super;
+            line-height: 0;
+            margin-right: 2px;
+        }
+
+        /* ── Tear-away Ticket Divider ────────────────── */
+        .ticket-divider {
+            position: relative;
+            display: flex;
+            align-items: center;
+            margin: 0 -40px;
+            background: #FFFFFF;
+        }
+        .ticket-divider .circle-left,
+        .ticket-divider .circle-right {
+            width: 28px; height: 28px;
+            background: #E8ECF4;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .ticket-divider .dash-line {
+            flex: 1;
+            border-top: 2px dashed #D0D8EC;
+            margin: 0 4px;
+        }
+        .ticket-divider .ticket-label {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #FFFFFF;
+            padding: 0 12px;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #A0AECB;
+            white-space: nowrap;
+        }
+
+        /* ── QR Section ──────────────────────────────── */
+        .qr-section {
+            background: #FFFFFF;
+            padding: 36px 40px;
+            text-align: center;
+        }
+        .qr-instruction {
+            font-size: 13px;
+            color: #8B9DC0;
+            margin-bottom: 24px;
+            line-height: 1.6;
+        }
+        .qr-instruction strong {
+            color: #4A5568;
+        }
+        .qr-frame {
+            display: inline-block;
+            position: relative;
+            padding: 4px;
+            background: linear-gradient(135deg, #5B5FEF, #3B3FA8);
+            border-radius: 16px;
+        }
+        .qr-inner {
+            background: #FFFFFF;
+            border-radius: 13px;
+            padding: 16px;
+            display: inline-block;
+        }
+        .qr-inner img {
+            width: 160px; height: 160px;
+            display: block;
+        }
+        /* Fallback QR placeholder when no image */
+        .qr-placeholder {
+            width: 160px; height: 160px;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 8px,
+                #EDF0F7 8px,
+                #EDF0F7 9px
+            ),
+            repeating-linear-gradient(
+                90deg,
+                transparent,
+                transparent 8px,
+                #EDF0F7 8px,
+                #EDF0F7 9px
+            );
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            color: #8B9DC0;
+            text-align: center;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .qr-ref {
+            margin-top: 14px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: #5B5FEF;
+        }
+        .scan-hint {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 10px;
+            background: #F7F9FF;
+            border: 1px solid #E4E9F5;
+            border-radius: 100px;
+            padding: 6px 14px;
+            font-size: 12px;
+            color: #4A5568;
+        }
+        .scan-dot {
+            width: 6px; height: 6px;
+            background: #5B5FEF;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        /* ── Info Strip ──────────────────────────────── */
+        .info-strip {
+            background: #FFF8EE;
+            border-top: 2px solid #F5A623;
+            padding: 16px 40px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        .info-icon {
+            font-size: 18px;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+        .info-text {
+            font-size: 13px;
+            color: #7A5600;
+            line-height: 1.5;
+        }
+        .info-text strong {
+            color: #5A3D00;
+        }
+
+        /* ── Footer ──────────────────────────────────── */
+        .footer {
+            background: #0F1729;
+            border-radius: 0 0 16px 16px;
+            padding: 28px 40px;
+            text-align: center;
+        }
+        .footer-logo {
+            font-size: 16px;
+            font-weight: 800;
+            color: #FFFFFF;
+            letter-spacing: -0.3px;
+            margin-bottom: 8px;
+        }
+        .footer-logo span { color: #5B5FEF; }
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 12px 0;
+        }
+        .footer-links a {
+            font-size: 12px;
+            color: #8B9DC0;
+            text-decoration: none;
+        }
+        .footer-meta {
+            font-size: 11px;
+            color: #4A5C80;
+            line-height: 1.8;
+            margin-top: 12px;
+        }
+
+        /* ── Responsive ──────────────────────────────── */
+        @media (max-width: 480px) {
+            .email-wrapper { padding: 0 8px 24px; margin: 16px auto; }
+            .brand-header, .body-card, .qr-section,
+            .info-strip, .footer, .hero-banner { padding-left: 24px; padding-right: 24px; }
+            .ticket-divider { margin: 0 -24px; }
+            .event-meta { grid-template-columns: 1fr; }
+            .hero-title { font-size: 22px; }
+        }
+    </style>
+</head>
+<body>
+<div class="email-wrapper">
+
+    <!-- Brand Header -->
+    <div class="brand-header">
+        <div>
+            <div class="brand-logo">Ticket<span>Flow</span></div>
+            <div class="brand-tagline">Live Event Ticketing</div>
+        </div>
+        <div class="confirmed-badge">✓ Confirmed</div>
+    </div>
+
+    <!-- Hero Banner -->
+    <div class="hero-banner">
+        <div class="hero-check">🎟</div>
+        <div class="hero-title">You're all set!</div>
+        <div class="hero-subtitle">Your booking has been confirmed and your e-tickets are ready.</div>
+        <div>
+            <div class="ref-pill" th:text="${booking.bookingReference}">TF-8847291</div>
+            <div class="ref-pill-label">Booking Reference</div>
+        </div>
+    </div>
+
+    <!-- Body Card -->
+    <div class="body-card">
+        <p class="greeting">
+            Hi <strong th:text="${booking.userName}">Alex Johnson</strong>, 👋<br>
+            <span style="color:#8B9DC0;font-size:14px;margin-top:4px;display:block;">
+                Here's everything you need for your upcoming event.
+            </span>
+        </p>
+
+        <!-- Event Details -->
+        <div class="section-label">
+            <div class="section-label-dot"></div>
+            <div class="section-label-text">Event Details</div>
+            <div class="section-label-line"></div>
+        </div>
+
+        <div class="event-card">
+            <div class="event-name" th:text="${booking.eventName}">International Music Festival 2025</div>
+            <div class="event-meta">
+                <div class="meta-item">
+                    <div class="meta-key">📅 Date &amp; Time</div>
+                    <div class="meta-value" th:text="${booking.eventDateTime}">Sat, 14 Jun 2025 · 7:00 PM</div>
+                </div>
+                <div class="meta-item">
+                    <div class="meta-key">📍 Venue</div>
+                    <div class="meta-value" th:text="${booking.venueName}">Madison Square Garden, NY</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seat Details -->
+        <div class="section-label">
+            <div class="section-label-dot"></div>
+            <div class="section-label-text">Your Seats</div>
+            <div class="section-label-line"></div>
+        </div>
+
+        <table class="seats-table">
+            <thead>
+                <tr>
+                    <th>Seat</th>
+                    <th>Section</th>
+                    <th>Price</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="seat : ${booking.seats}">
+                    <td>
+                        <span class="seat-badge" th:text="${seat.seatNumber}">A14</span>
+                    </td>
+                    <td>
+                        <span class="section-chip" th:text="${seat.section}">VIP Floor</span>
+                    </td>
+                    <td>$<span th:text="${seat.price}">149.00</span></td>
+                </tr>
+                <!-- Preview rows (remove in production) -->
+                <tr th:if="${booking.seats == null}">
+                    <td><span class="seat-badge">B07</span></td>
+                    <td><span class="section-chip">Premium</span></td>
+                    <td>$89.00</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="total-row">
+            <div class="total-label">Total Paid</div>
+            <div class="total-amount">
+                <span class="currency">$</span><span th:text="${booking.totalAmount}">238.00</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tear-away Divider -->
+    <div class="ticket-divider">
+        <div class="circle-left"></div>
+        <div class="dash-line"></div>
+        <div class="ticket-label">✂ Scan at Entrance</div>
+        <div class="dash-line"></div>
+        <div class="circle-right"></div>
+    </div>
+
+    <!-- QR Code Section -->
+    <div class="qr-section">
+        <p class="qr-instruction">
+            <strong>Present this QR code at the venue entrance.</strong><br>
+            One scan per ticket. Screenshot accepted.
+        </p>
+
+        <div th:if="${booking.qrCodeUrl}">
+            <div class="qr-frame">
+                <div class="qr-inner">
+                    <img th:src="${booking.qrCodeUrl}" alt="Entry QR Code" />
+                </div>
+            </div>
+        </div>
+
+        <!-- Fallback placeholder (remove in production if not needed) -->
+        <div th:unless="${booking.qrCodeUrl}">
+            <div class="qr-frame">
+                <div class="qr-inner">
+                    <div class="qr-placeholder">QR Code<br>Generated<br>at Dispatch</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="qr-ref" th:text="${booking.bookingReference}">TF-8847291</div>
+        <div>
+            <span class="scan-hint">
+                <span class="scan-dot"></span>
+                Ready to scan at venue gates
+            </span>
+        </div>
+    </div>
+
+    <!-- Info Strip -->
+    <div class="info-strip">
+        <div class="info-icon">💡</div>
+        <div class="info-text">
+            <strong>Heads up:</strong> Arrive at least 30 minutes before the event starts.
+            Tickets are non-transferable and must match the name on your booking.
+            Contact support if you have any issues.
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <div class="footer-logo">Ticket<span>Flow</span></div>
+        <div class="footer-links">
+            <a href="#">Help Center</a>
+            <a href="#">My Bookings</a>
+            <a href="#">Refund Policy</a>
+            <a href="#">Contact Us</a>
+        </div>
+        <div class="footer-meta">
+            © 2025 TicketFlow, Inc. · All rights reserved<br>
+            This is an automated message — please do not reply to this email.<br>
+            <span style="color:#2E4070;">You're receiving this because you made a booking on TicketFlow.</span>
+        </div>
+    </div>
+
+</div>
+</body>
+</html>

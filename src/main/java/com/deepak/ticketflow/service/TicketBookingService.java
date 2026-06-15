@@ -6,7 +6,10 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
+import com.deepak.ticketflow.model.*;
+import com.deepak.ticketflow.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -27,19 +30,12 @@ import com.deepak.ticketflow.handlers.ReservationExpiredException;
 import com.deepak.ticketflow.handlers.ReservationNotFoundException;
 import com.deepak.ticketflow.handlers.SeatNotAvailableException;
 import com.deepak.ticketflow.handlers.SeatNotFoundException;
-import com.deepak.ticketflow.model.Booking;
-import com.deepak.ticketflow.model.BookingSeat;
-import com.deepak.ticketflow.model.Event;
-import com.deepak.ticketflow.model.Reservation;
-import com.deepak.ticketflow.model.Seat;
-import com.deepak.ticketflow.repository.BookingRepository;
-import com.deepak.ticketflow.repository.BookingSeatRepository;
-import com.deepak.ticketflow.repository.EventRepository;
-import com.deepak.ticketflow.repository.ReservationRepository;
-import com.deepak.ticketflow.repository.SeatRepository;
+import com.deepak.ticketflow.handlers.UserNotFoundException;
+import com.deepak.ticketflow.handlers.EventNotFoundException;
 import com.deepak.ticketflow.service.queue.VirtualQueueService;
 import com.deepak.ticketflow.service.queue.SseNotificationService;
 import com.deepak.ticketflow.event.BookingSlotFreedEvent;
+import com.deepak.ticketflow.dto.EmailNotificationDTO;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -58,6 +54,8 @@ public class TicketBookingService {
     @Autowired private VirtualQueueService   queueService;
     @Autowired private SseNotificationService sseNotificationService;
     @Autowired private ApplicationEventPublisher applicationEventPublisher;
+    @Autowired private UserRepository userRepository;
+    @Autowired private EmailNotificationProducer emailNotificationProducer;
     @Transactional
     public ReservationResponse reserveSeats(Long eventId,
                                             List<String> seatNumbers,
@@ -257,11 +255,54 @@ public class TicketBookingService {
         applicationEventPublisher.publishEvent(
                 new BookingSlotFreedEvent(this, eventId)
         );
-
+        //Notification Service-Email
+        sendBookingEmailAsync(booking, seats, userId, eventId);
         log.info("Booking confirmed: {} for user {} ({} seats). Published BookingSlotFreedEvent for event {}",
                 booking.getBookingReference(), userId, seats.size(), eventId);
 
         return new BookingResponse(booking);
+    }
+    private void sendBookingEmailAsync(Booking booking, List<Seat> seats, Integer userId, Long eventId) {
+        try {
+            // Fetch user details
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new UserNotFoundException("User not found: " + userId));
+            
+            // Fetch event details
+            Event event = eventRepository.findById(eventId)
+                    .orElseThrow(() -> new EventNotFoundException("Event not found: " + eventId));
+            
+            // Prepare seat details
+            List<EmailNotificationDTO.SeatDetail> seatDetails = seats.stream()
+                    .map(seat -> EmailNotificationDTO.SeatDetail.builder()
+                            .seatNumber(seat.getSeatNumber())
+                            .section(seat.getSection())
+                            .price(seat.getPrice())
+                            .build())
+                    .collect(Collectors.toList());
+            
+            // Build email DTO
+            EmailNotificationDTO emailDTO = EmailNotificationDTO.builder()
+                    .toEmail(user.getEmail())
+                    .userName(user.getFullName())
+                    .bookingReference(booking.getBookingReference())
+                    .eventId(eventId)
+                    .eventName(event.getEventName())
+                    .eventDateTime(event.getEventDate())
+                    .venueName(event.getVenueName())
+                    .seats(seatDetails)
+                    .totalAmount(booking.getTotalAmount())
+                    .bookingConfirmedAt(booking.getConfirmedAt())
+                    .build();
+            
+            // Send to queue (non-blocking)
+            emailNotificationProducer.sendBookingConfirmationEmail(emailDTO);
+            
+            log.info("Email notification queued for booking: {}", booking.getBookingReference());
+        } catch (Exception e) {
+            // Don't fail the booking if email queuing fails
+            log.error("Failed to queue email for booking: {}", booking.getBookingReference(), e);
+        }
     }
     // ─────────────────────────────────────────────────────────────
     // Helpers
