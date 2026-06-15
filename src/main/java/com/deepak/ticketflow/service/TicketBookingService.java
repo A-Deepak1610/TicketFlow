@@ -30,10 +30,12 @@ import com.deepak.ticketflow.handlers.ReservationExpiredException;
 import com.deepak.ticketflow.handlers.ReservationNotFoundException;
 import com.deepak.ticketflow.handlers.SeatNotAvailableException;
 import com.deepak.ticketflow.handlers.SeatNotFoundException;
+import com.deepak.ticketflow.handlers.UserNotFoundException;
+import com.deepak.ticketflow.handlers.EventNotFoundException;
 import com.deepak.ticketflow.service.queue.VirtualQueueService;
 import com.deepak.ticketflow.service.queue.SseNotificationService;
 import com.deepak.ticketflow.event.BookingSlotFreedEvent;
-import com.deepak.ticketflow.service.EmailNoEmailNotificationProducer;
+import com.deepak.ticketflow.dto.EmailNotificationDTO;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -53,7 +55,7 @@ public class TicketBookingService {
     @Autowired private SseNotificationService sseNotificationService;
     @Autowired private ApplicationEventPublisher applicationEventPublisher;
     @Autowired private UserRepository userRepository;
-    @EmailNotificationProducer emailNotificationProducer;
+    @Autowired private EmailNotificationProducer emailNotificationProducer;
     @Transactional
     public ReservationResponse reserveSeats(Long eventId,
                                             List<String> seatNumbers,
@@ -271,8 +273,8 @@ public class TicketBookingService {
                     .orElseThrow(() -> new EventNotFoundException("Event not found: " + eventId));
             
             // Prepare seat details
-            List<com.ticketflow.dto.EmailNotificationDTO.SeatDetail> seatDetails = seats.stream()
-                    .map(seat -> com.ticketflow.dto.EmailNotificationDTO.SeatDetail.builder()
+            List<EmailNotificationDTO.SeatDetail> seatDetails = seats.stream()
+                    .map(seat -> EmailNotificationDTO.SeatDetail.builder()
                             .seatNumber(seat.getSeatNumber())
                             .section(seat.getSection())
                             .price(seat.getPrice())
@@ -280,7 +282,7 @@ public class TicketBookingService {
                     .collect(Collectors.toList());
             
             // Build email DTO
-            com.ticketflow.dto.EmailNotificationDTO emailDTO = com.ticketflow.dto.EmailNotificationDTO.builder()
+            EmailNotificationDTO emailDTO = EmailNotificationDTO.builder()
                     .toEmail(user.getEmail())
                     .userName(user.getFullName())
                     .bookingReference(booking.getBookingReference())

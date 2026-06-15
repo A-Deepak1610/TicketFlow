@@ -18,7 +18,8 @@ public class ApiExceptionHandler {
         return build(HttpStatus.CONFLICT, ex.getMessage(), request);
     }
 
-    @ExceptionHandler({SeatNotFoundException.class, ReservationNotFoundException.class})
+    @ExceptionHandler({SeatNotFoundException.class, ReservationNotFoundException.class,
+            UserNotFoundException.class, EventNotFoundException.class})
     public ResponseEntity<ErrorResponse> handleNotFound(RuntimeException ex,
                                                         HttpServletRequest request) {
         return build(HttpStatus.NOT_FOUND, ex.getMessage(), request);

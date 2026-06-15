@@ -1,10 +1,12 @@
 // config/RabbitMQRetryConfig.java
-package com.ticketflow.config;
+package com.deepak.ticketflow.config;
 
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.TopicExchange;
+import org.springframework.amqp.core.QueueBuilder;
+import org.springframework.amqp.core.ExchangeBuilder;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
@@ -14,7 +16,7 @@ import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.retry.support.RetryTemplate;
+import org.springframework.amqp.rabbit.config.RetryInterceptorBuilder;
 
 @Configuration
 public class RabbitMQRetryConfig {
@@ -55,9 +57,10 @@ public class RabbitMQRetryConfig {
         factory.setMaxConcurrentConsumers(10);
         
         // Retry configuration
-        factory.setAdviceChain(RetryTemplate.builder()
+        factory.setAdviceChain(RetryInterceptorBuilder.stateless()
                 .maxAttempts(3)
-                .exponentialBackoff(1000, 2, 10000)
+                .backOffOptions(1000, 2.0, 10000)
+                .recoverer(new RejectAndDontRequeueRecoverer())
                 .build());
         
         return factory;

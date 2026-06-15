@@ -1,5 +1,5 @@
 
-package com.ticketflow.dto;
+package com.deepak.ticketflow.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

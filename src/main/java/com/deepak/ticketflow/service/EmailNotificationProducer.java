@@ -1,7 +1,7 @@
 // service/EmailNotificationProducer.java
 package com.deepak.ticketflow.service;
 
-import com.ticketflow.dto.EmailNotificationDTO;
+import com.deepak.ticketflow.dto.EmailNotificationDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -32,7 +32,7 @@ public class EmailNotificationProducer {
                 emailDTO,
                 message -> {
                     message.getMessageProperties().setHeader("message-type", "booking-confirmation");
-                    message.getMessageProperties().setExpiration("3600000"); // 1 hour TTL
+                    message.getMessageProperties().setExpiration("60000"); // 1 hour TTL
                     return message;
                 }
             );
