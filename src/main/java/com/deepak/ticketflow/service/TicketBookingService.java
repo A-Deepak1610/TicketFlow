@@ -445,4 +445,7 @@ public class TicketBookingService {
         // Publish event to trigger admission of waiting users
         applicationEventPublisher.publishEvent(new BookingSlotFreedEvent(this, eventId));
     }
+    // public boolean validateEventDate(Integer eventId){
+    //     Event
+    // }
 }
