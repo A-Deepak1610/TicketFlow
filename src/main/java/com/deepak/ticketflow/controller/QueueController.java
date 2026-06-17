@@ -8,10 +8,17 @@ import com.deepak.ticketflow.filters.CustomUserPrincipal;
 import com.deepak.ticketflow.Enum.UserType;
 import com.deepak.ticketflow.service.queue.QueueDecisionService;
 import com.deepak.ticketflow.service.queue.VirtualQueueService;
+import com.deepak.ticketflow.model.Event;
+import com.deepak.ticketflow.repository.EventRepository;
+import com.deepak.ticketflow.handlers.EventNotFoundException;
+import com.deepak.ticketflow.handlers.InvalidReservationException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/api/queue")
@@ -20,12 +27,26 @@ public class QueueController {
 
     private final QueueDecisionService decisionService;
     private final VirtualQueueService queueService;
+    private final EventRepository eventRepository;
 
     @PostMapping("/join")
     public ResponseEntity<QueueJoinResponse> joinQueue(
             @RequestBody QueueJoinRequest request,
             @AuthenticationPrincipal CustomUserPrincipal principal) {
         request.setUserId(principal.getUserId());
+        
+        // Verify event sales status
+        Event event = eventRepository.findById(request.getEventId())
+                .orElseThrow(() -> new EventNotFoundException("Event not found: " + request.getEventId()));
+
+        LocalDateTime now = LocalDateTime.now();
+        if (event.getSaleStartTime() != null && now.isBefore(event.getSaleStartTime())) {
+            throw new InvalidReservationException("Event sales have not started yet");
+        }
+        if (event.getEventDate() != null && now.isAfter(event.getEventDate())) {
+            throw new InvalidReservationException("Event sales have ended");
+        }
+
         // Determine if queue is needed
         QueueDecision decision = decisionService.decide(
                 request.getEventId(),

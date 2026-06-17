@@ -18,8 +18,8 @@ import com.deepak.ticketflow.dto.ReservationRequest;
 import com.deepak.ticketflow.dto.ReservationResponse;
 import com.deepak.ticketflow.service.TicketBookingService;
 
-import java.util.HashMap;  // ← ADD THIS IMPORT
-import java.util.Map;     // ← ADD THIS IMPORT
+import java.util.HashMap;  
+import java.util.Map;     
 
 @RestController
 @RequestMapping("/api")
@@ -29,7 +29,7 @@ public class BookingController{
     private TicketBookingService ticketBookingService;
 
     @Autowired
-    private VirtualQueueService queueService;  // ← ADD THIS
+    private VirtualQueueService queueService;  
 
     @PostMapping("/reservations")
     public ResponseEntity<?> reserveSeats(

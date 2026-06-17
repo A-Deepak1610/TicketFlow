@@ -1,6 +1,7 @@
 package com.deepak.ticketflow.service.queue;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -11,6 +12,10 @@ import org.springframework.stereotype.Service;
 import com.deepak.ticketflow.Enum.UserType;
 import com.deepak.ticketflow.dto.queue.QueueJoinResponse;
 import com.deepak.ticketflow.dto.queue.QueuePositionResponse;
+import com.deepak.ticketflow.model.Event;
+import com.deepak.ticketflow.repository.EventRepository;
+import com.deepak.ticketflow.handlers.EventNotFoundException;
+import com.deepak.ticketflow.handlers.InvalidReservationException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +30,7 @@ public class VirtualQueueService {
 
     private final StringRedisTemplate redis;
     private final AdmissionControllerService admissionControllerService;
+    private final EventRepository eventRepository;
 
     private String getQueueKey(Long eventId, UserType userType) {
         return "queue:" + eventId + ":" + userType.name().toLowerCase();
@@ -143,6 +149,17 @@ public class VirtualQueueService {
      * Generate booking token when user reaches front of queue
      */
     public String generateBookingToken(Long eventId, Integer userId, UserType userType, int expiryMinutes) {
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new EventNotFoundException("Event not found: " + eventId));
+
+        LocalDateTime now = LocalDateTime.now();
+        if (event.getSaleStartTime() != null && now.isBefore(event.getSaleStartTime())) {
+            throw new InvalidReservationException("Event sales have not started yet");
+        }
+        if (event.getEventDate() != null && now.isAfter(event.getEventDate())) {
+            throw new InvalidReservationException("Event sales have ended");
+        }
+
         String tokenKey = buildTokenKey(eventId, userId);
         Duration expiry = Duration.ofMinutes(expiryMinutes);
         String token = UUID.randomUUID().toString();
