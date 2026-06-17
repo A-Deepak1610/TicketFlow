@@ -130,4 +130,30 @@ public class SseNotificationService {
     private String getQueueKey(Long eventId, UserType userType) {
         return "queue:" + eventId + ":" + userType.name().toLowerCase();
     }
+
+    public void sendEventStatusUpdate(Long eventId, String status) {
+        if (eventId == null || status == null) {
+            return;
+        }
+        Map<String, Object> update = Map.of(
+                "type", "EVENT_STATUS_UPDATE",
+                "eventId", eventId,
+                "status", status
+        );
+
+        for (Map.Entry<Integer, Long> entry : userEvents.entrySet()) {
+            if (eventId.equals(entry.getValue())) {
+                Integer userId = entry.getKey();
+                SseEmitter emitter = emitters.get(userId);
+                if (emitter != null) {
+                    try {
+                        emitter.send(update);
+                    } catch (IOException e) {
+                        emitters.remove(userId);
+                        userEvents.remove(userId);
+                    }
+                }
+            }
+        }
+    }
 }
