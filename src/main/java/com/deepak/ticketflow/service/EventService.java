@@ -21,6 +21,9 @@ public class EventService {
     SeatGenerationService seatGenerationService;
     @Autowired
     SeatRepository seatRepository;
+    @Autowired
+    EventSchedulerService schedulerService;
+
     public EventWithSeatsResponse createEvent(CreateEventRequest request) {
         Event event = new Event();
         event.setEventName(request.getEventName());
@@ -53,6 +56,9 @@ public class EventService {
             return s;
         }).toList();
         response.setSeats(seatResponses);
+        schedulerService.scheduleBookingOpen(savedEvent);
+        schedulerService.scheduleBookingClose(savedEvent);
+
         return response;
     }
     public List<Event> getEvents(){

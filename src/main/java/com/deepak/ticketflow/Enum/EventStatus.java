@@ -4,5 +4,7 @@ public enum EventStatus {
     UPCOMING,
     ON_SALE,
     SOLD_OUT,
-    CANCELLED
+    CANCELLED,
+    OPEN,
+    CLOSED
 }
