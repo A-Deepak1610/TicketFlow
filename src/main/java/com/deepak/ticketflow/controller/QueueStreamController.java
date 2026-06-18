@@ -2,6 +2,8 @@ package com.deepak.ticketflow.controller;
 
 import com.deepak.ticketflow.filters.CustomUserPrincipal;
 import com.deepak.ticketflow.service.queue.SseNotificationService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,10 +20,15 @@ import java.io.InvalidObjectException;
 @RestController
 @RequestMapping("/api/queue")
 @RequiredArgsConstructor
+@Tag(name = "Virtual Queue Live Stream", description = "Server-Sent Events (SSE) endpoints for real-time queue notifications and testing")
 public class QueueStreamController {
 
     private final SseNotificationService notificationService;
 
+    @Operation(
+        summary = "Stream Queue Updates",
+        description = "Subscribes to real-time status and position updates for the virtual queue using Server-Sent Events (SSE)."
+    )
     @GetMapping("/stream")
     public SseEmitter stream(
             @RequestParam(required = false) Long eventId,
@@ -31,6 +38,10 @@ public class QueueStreamController {
         return notificationService.subscribe(  
                 principal.getUserId(), eventId);
     }
+    @Operation(
+        summary = "Send Test Event",
+        description = "Sends a mock test message through the SSE stream to verify the connection is active."
+    )
     @GetMapping("/test")
     public String test(@AuthenticationPrincipal CustomUserPrincipal principal) throws IOException {
         notificationService.sendMessage("Hello from server",principal.getUserId());

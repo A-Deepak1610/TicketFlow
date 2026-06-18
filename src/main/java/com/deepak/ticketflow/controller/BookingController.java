@@ -2,6 +2,8 @@ package com.deepak.ticketflow.controller;
 
 import com.deepak.ticketflow.filters.CustomUserPrincipal;
 import com.deepak.ticketflow.service.queue.VirtualQueueService;  // ← ADD THIS IMPORT
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;  // ← ADD THIS IMPORT
 import org.springframework.http.ResponseEntity;
@@ -23,6 +25,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
+@Tag(name = "Booking & Reservations", description = "APIs for reserving seats and confirming ticket bookings")
 public class BookingController{
 
     @Autowired
@@ -31,6 +34,10 @@ public class BookingController{
     @Autowired
     private VirtualQueueService queueService;  
 
+    @Operation(
+        summary = "Reserve Seats",
+        description = "Temporarily reserves the requested seat numbers for a specific event. Requires a valid 'X-Queue-Token' header if the virtual queue is active."
+    )
     @PostMapping("/reservations")
     public ResponseEntity<?> reserveSeats(
                                             @RequestBody ReservationRequest request,
@@ -63,14 +70,10 @@ public class BookingController{
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Step 2 — Confirm booking after payment (idempotent via header)
-     * Accepts multiple reservation IDs — processes all in one atomic transaction
-     * POST /api/bookings/confirm
-     * Header: Idempotency-Key: <uuid>
-     * Header: X-Queue-Token: <token-from-queue>
-     * Body: { "reservationIds": [123, 124, 125], "paymentRequest": { "amount": 5000.00, "paymentMethod": "UPI" } }
-     */
+    @Operation(
+        summary = "Confirm Booking",
+        description = "Finalizes the ticket purchase/booking after payment processing. Requires a valid 'Idempotency-Key' to prevent double transactions, and a valid 'X-Queue-Token' header if virtual queue is active."
+    )
     @PostMapping("/bookings/confirm")
     public ResponseEntity<?> confirmBooking(  // ← CHANGE ResponseEntity<BookingResponse> to ResponseEntity<?>
                                               @RequestBody ConfirmBookingRequest request,
