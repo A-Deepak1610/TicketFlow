@@ -12,6 +12,8 @@ import com.deepak.ticketflow.model.Event;
 import com.deepak.ticketflow.repository.EventRepository;
 import com.deepak.ticketflow.handlers.EventNotFoundException;
 import com.deepak.ticketflow.handlers.InvalidReservationException;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -23,12 +25,17 @@ import java.time.LocalDateTime;
 @RestController
 @RequestMapping("/api/queue")
 @RequiredArgsConstructor
+@Tag(name = "Virtual Queue", description = "APIs for joining the virtual queue and checking user's queue position")
 public class QueueController {
 
     private final QueueDecisionService decisionService;
     private final VirtualQueueService queueService;
     private final EventRepository eventRepository;
 
+    @Operation(
+        summary = "Join Queue",
+        description = "Allows the user to join the virtual queue for a specific event. Returns a booking token if load is low (DIRECT mode), or a queue status response if a queue is active."
+    )
     @PostMapping("/join")
     public ResponseEntity<QueueJoinResponse> joinQueue(
             @RequestBody QueueJoinRequest request,
@@ -80,6 +87,10 @@ public class QueueController {
         }
     }
 
+    @Operation(
+        summary = "Get Queue Position",
+        description = "Retrieves the current queue position, status, and estimated wait time for the authenticated user."
+    )
     @GetMapping("/position")
     public ResponseEntity<QueuePositionResponse> getPosition(
             @RequestParam Long eventId,
