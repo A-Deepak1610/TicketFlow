@@ -31,7 +31,7 @@ public class SpringConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http.csrf(csrf->csrf.disable())
-                .authorizeHttpRequests(auth -> auth.requestMatchers("/login", "/register","/refresh","/events","/events/*","/actuator/prometheus","/").permitAll()
+                .authorizeHttpRequests(auth -> auth.requestMatchers("/login", "/register","/refresh","/events","/events/*","/actuator/prometheus","/swagger-ui.html","/swagger-ui/index.html","/v3/api-docs","/").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session->session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
