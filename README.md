@@ -82,7 +82,7 @@ To protect the backend database from sudden spikes in traffic (e.g., when ticket
 *   **Dynamic Decisioning (`QueueDecisionService`)**: Evaluates system capacity, current request rate (RPS), and active active-session metrics to switch between **`DIRECT`** access (low load) and waiting queues (**`SOFT_QUEUE`** or **`HARD_QUEUE`**).
 *   **FIFO & Priority Lanes**: Leverages Redis lists (`queue:{eventId}:vip` and `queue:{eventId}:normal`) to maintain strict order. Serves VIP users with early access and higher priority ratios.
 *   **Server-Sent Events (SSE)**: Rather than resource-heavy polling, users subscribe to `/api/queue/stream`. The system pushes real-time updates for:
-    *   `POSITION`: Current waiting placement and dynamic wait time updates.
+    *   `POSITION`: Current waiting placement and dynamic wait time updates.    
     *   `BOOKING_ALLOWED`: Emitted when the queue processor admits the user, delivering a temporary `X-Queue-Token` allowing booking access.
     *   `EVENT_STATUS_UPDATE`: Live sales opening and closing alerts.
     *   `SEAT_STATUS_UPDATE`: Real-time changes in seat availability to enable live frontend map updates.
