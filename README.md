@@ -7,6 +7,7 @@ TicketFlow is a high-performance, concurrent, and resilient Spring Boot backend 
 ## 🏗️ Architectural Overview & Booking Flow
 
 TicketFlow uses a hybrid model of **MySQL** (for persistent relational integrity) and **Redis** (for high-speed locks, active user counts, and queuing lists).
+ <img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/cf2fdff8-cd13-4acc-84d9-e6bf00b88ca3" />
 
 ```mermaid
 sequenceDiagram
