@@ -32,21 +32,52 @@ public class BookingController{
     private TicketBookingService ticketBookingService;
 
     @Autowired
-    private VirtualQueueService queueService;  
+    private VirtualQueueService queueService;
+
+    @Autowired
+    private com.deepak.ticketflow.service.security.AntiScalpingService antiScalpingService;
 
     @Operation(
         summary = "Reserve Seats",
-        description = "Temporarily reserves the requested seat numbers for a specific event. Requires a valid 'X-Queue-Token' header if the virtual queue is active."
+        description = "Temporarily reserves the requested seat numbers for a specific event. Requires a valid 'X-Queue-Token' header and checks Anti-Scalping Shield (with optional X-Captcha-Token)."
     )
     @PostMapping("/reservations")
     public ResponseEntity<?> reserveSeats(
                                             @RequestBody ReservationRequest request,
                                             @RequestHeader(value = "X-Queue-Token", required = false) String queueToken,
-                                            @AuthenticationPrincipal CustomUserPrincipal principal) {
+                                            @RequestHeader(value = "X-Captcha-Token", required = false) String captchaToken,
+                                            @AuthenticationPrincipal CustomUserPrincipal principal,
+                                            jakarta.servlet.http.HttpServletRequest servletRequest) {
 
         Integer userId = principal.getUserId();
-        // ← START: ADD QUEUE VALIDATION
-        // Validate queue token if present
+
+        // 1. Anti-Scalping & Bot Shield Validation
+        String clientIp = servletRequest.getHeader("X-Forwarded-For");
+        if (clientIp == null || clientIp.isBlank() || "unknown".equalsIgnoreCase(clientIp)) {
+            clientIp = servletRequest.getRemoteAddr();
+        }
+        if (clientIp != null && clientIp.contains(",")) {
+            clientIp = clientIp.split(",")[0].trim();
+        }
+        String userAgent = servletRequest.getHeader("User-Agent");
+
+        try {
+            antiScalpingService.validateReservationRequest(
+                    request.getEventId(),
+                    request.getSeatNumbers(),
+                    userId,
+                    clientIp,
+                    userAgent,
+                    captchaToken
+            );
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Anti-Scalping Protection Triggered");
+            error.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+        }
+
+        // 2. Queue Token Validation
         if (queueToken == null || queueToken.isEmpty()) {
             Map<String, String> error = new HashMap<>();
             error.put("error", "Queue token required");
@@ -60,7 +91,6 @@ public class BookingController{
             error.put("message", "Please rejoin the queue");
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
         }
-        // ← END: ADD QUEUE VALIDATION
 
         ReservationResponse response = ticketBookingService.reserveSeats(
                 request.getEventId(),

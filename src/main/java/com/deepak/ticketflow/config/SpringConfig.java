@@ -30,8 +30,12 @@ public class SpringConfig {
     CustomAccessDeniedHandler customAccessDeniedHandler;
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        return http.csrf(csrf->csrf.disable())
-                .authorizeHttpRequests(auth -> auth.requestMatchers("/login", "/register","/refresh","/events","/events/*","/actuator/prometheus","/swagger-ui.html","/swagger-ui/**","/v3/api-docs/**","/").permitAll()
+        return http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .csrf(csrf->csrf.disable())
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/login", "/register","/refresh","/events","/events/*","/actuator/prometheus","/actuator/health","/actuator/**","/swagger-ui.html","/swagger-ui/**","/v3/api-docs/**","/").permitAll()
+                        .requestMatchers("/api/security/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session->session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -41,6 +45,19 @@ public class SpringConfig {
                         .accessDeniedHandler(customAccessDeniedHandler)
                 )
                 .build();
+    }
+
+    @Bean
+    public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
+        org.springframework.web.cors.CorsConfiguration configuration = new org.springframework.web.cors.CorsConfiguration();
+        configuration.setAllowedOriginPatterns(java.util.List.of("*"));
+        configuration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));
+        configuration.setAllowedHeaders(java.util.List.of("*"));
+        configuration.setExposedHeaders(java.util.List.of("Authorization", "X-Queue-Token", "Idempotency-Key", "X-Captcha-Token"));
+        configuration.setAllowCredentials(true);
+        org.springframework.web.cors.UrlBasedCorsConfigurationSource source = new org.springframework.web.cors.UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
     @Bean//Create this object and manage it so that it can be injected anywhere using @Autowired
     public AuthenticationManager authenticationManager(

@@ -31,7 +31,9 @@ public class UserService {
         User user = new User();
         user.setUserName(userDto.userName());
         user.setPassword(passwordEncoder.encode(userDto.password()));
+        user.setEmail(userDto.email() != null && !userDto.email().isBlank() ? userDto.email() : userDto.userName() + "@ticketflow.com");
         user.setRole(Role.ROLE_ADMIN);
+        user.setCreatedAt(java.time.LocalDateTime.now());
         return userRepo.save(user);
     }
     public boolean exists(String userName){
@@ -50,6 +52,9 @@ public class UserService {
                 Map<String,String> tokens = new HashMap<>();
                 tokens.put("accessToken", accessToken);
                 tokens.put("refreshToken", refreshToken.getToken());
+                tokens.put("role", user1.getRole().name());
+                tokens.put("userId", String.valueOf(user1.getId()));
+                tokens.put("userName", user1.getUserName());
                 return  tokens;
             }
         } catch (AuthenticationException e) {

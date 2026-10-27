@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TicketFlow | Live Event Seat Allocator &amp; Virtual Queue</title>
+  <meta name="description" content="Consumer ticket booking portal. Interactive seat selection, anti-scalping captcha verification, and distributed virtual queue.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  
+  <script>
+    // Route Guard: Ensure Authenticated Session
+    (function() {
+      const sessionStr = localStorage.getItem('ticketflow_session');
+      if (!sessionStr) {
+        window.location.replace('login.html');
+      }
+    })();
+  </script>
+</head>
+<body>
+
+<div id="app-container">
+  
+  <!-- Left Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo-badge">TF</div>
+      <div class="logo-info">
+        <h1>TicketFlow</h1>
+        <p>Consumer Ticketing Portal</p>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <!-- Section: Booking & Queue -->
+      <div class="nav-section-label">BOOKING &amp; QUEUE</div>
+      <ul class="nav-items">
+        <li>
+          <a class="nav-link active" data-nav="seats" id="nav-item-seats">
+            <div class="nav-link-left">
+              <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M4 18v3h16v-3M4 14h16M7 10h10M6 6h12"></path>
+              </svg>
+              <span>Seat Allocator</span>
+            </div>
+            <span class="nav-pill-count accent">Live</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-link" data-nav="queue" id="nav-item-queue">
+            <div class="nav-link-left">
+              <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+              </svg>
+              <span>Virtual Queue</span>
+            </div>
+            <span class="nav-pill-count">1.2k</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-link" data-nav="metrics" id="nav-item-metrics">
+            <div class="nav-link-left">
+              <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+              </svg>
+              <span>System Telemetry</span>
+            </div>
+            <span class="nav-pill-count alert">Metrics</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+
+    <!-- Bottom User Profile Card -->
+    <div class="sidebar-footer">
+      <div class="user-profile-card">
+        <div class="user-profile-left">
+          <div class="user-avatar" id="user-profile-avatar">DA</div>
+          <div class="user-name-role">
+            <h4 id="user-profile-name">Deepak A.</h4>
+            <span class="role-tag-pill user" id="user-profile-role-tag">Verified User</span>
+          </div>
+        </div>
+        <button class="btn-icon-soft" title="Logout Session" onclick="logoutUser()" id="btn-sidebar-logout" style="color: #ef4444;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content Container -->
+  <main class="main-content">
+    
+    <!-- Top Navigation Bar -->
+    <header class="top-navbar">
+      <div class="navbar-left">
+        <div class="tag-badge-pill" id="top-badge-event-id">LIVE#6 - IND VS SA</div>
+        <div class="breadcrumbs">
+          TicketFlow / <span class="current">Consumer Portal</span>
+        </div>
+      </div>
+
+      <div class="navbar-right">
+        <div class="top-action-btn" title="Anti-Scalping Security Layer">
+          <span class="pulse-badge"><span class="pulse-dot"></span> Anti-Scalp: <strong id="top-policy-label">STRICT</strong></span>
+        </div>
+
+        <button class="btn-logout" onclick="logoutUser()" title="Sign Out of Session">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+          Sign Out
+        </button>
+
+        <div class="nav-user-pill" title="Current User Session">
+          <div class="user-avatar" style="width: 24px; height: 24px; font-size: 11px;">DA</div>
+          <span style="font-size: 12.5px; font-weight: 600;" id="top-nav-user">Deepak A.</span>
+          <span class="role-tag-pill user" id="top-nav-role">Verified User</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Page Body -->
+    <div class="page-body">
+      
+      <!-- Page Title & Primary Actions Row -->
+      <div class="page-title-row">
+        <div>
+          <div class="title-with-badge">
+            <h2 class="page-title">Seat Manager &amp; Concurrency Engine</h2>
+            <span class="status-indicator-pill">
+              <span class="status-dot"></span>
+              Virtual Queue Gatekeeper Active
+            </span>
+          </div>
+          <p class="page-subtitle">Real-time seat allocation, anti-scalp captcha verification, and distributed Redis locking.</p>
+        </div>
+
+        <div class="title-actions">
+          <button class="btn-secondary" onclick="loadEvents()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+            </svg>
+            Refresh Events
+          </button>
+          <button class="btn-primary" onclick="joinVirtualQueue()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            Live Queue Test
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI Metrics Row -->
+      <div class="metrics-kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">QUEUE STATUS</div>
+          <div class="kpi-value-row">
+            <span class="kpi-value">DIRECT</span>
+            <span class="kpi-status-badge">● Low Load</span>
+          </div>
+          <div class="kpi-subtext">Instant Admission Token Active</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-label">OPERATIONAL EVENTS</div>
+          <div class="kpi-value-row">
+            <span class="kpi-value" id="kpi-operational-fleet">3 / 7</span>
+            <span class="kpi-status-badge amber">Sales Active</span>
+          </div>
+          <div class="kpi-subtext">Automated Status Transitions</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-label">ANTI-SCALPING SHIELD</div>
+          <div class="kpi-value-row">
+            <span class="kpi-value" id="kpi-security-blocked">Active</span>
+            <span class="kpi-status-badge" style="background-color: #ecfdf5; color: #047857;" id="kpi-security-status">● Protected</span>
+          </div>
+          <div class="kpi-subtext" id="kpi-security-subtext">HMAC Captcha &amp; Rate Guard</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-label">CONCURRENCY SAFETY</div>
+          <div class="kpi-value-row">
+            <span class="kpi-value">100%</span>
+            <span class="kpi-status-badge">● Strict Live Data</span>
+          </div>
+          <div class="kpi-subtext">Redis Locks &amp; Versioning</div>
+        </div>
+      </div>
+
+      <!-- Dual-Panel Main Workspace -->
+      <div class="workspace-grid">
+        
+        <!-- Left Panel: Event Selector -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title-group">
+              <span class="panel-title">SELECT EVENT</span>
+              <span class="panel-count" id="events-count-badge">7 events</span>
+            </div>
+            <button class="btn-icon-soft" onclick="loadEvents()" title="Refresh List">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+              </svg>
+            </button>
+          </div>
+
+          <div class="panel-search-box">
+            <div class="search-input-wrapper">
+              <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="text" class="search-input" id="event-search-input" placeholder="Search event or venue...">
+            </div>
+          </div>
+
+          <ul class="event-list" id="events-target-list">
+            <!-- Event Items populated dynamically -->
+          </ul>
+        </div>
+
+        <!-- Right Panel: Detailed Management & Live Map -->
+        <div class="panel-card">
+          
+          <!-- Detail Header -->
+          <div class="detail-header-card">
+            <div class="detail-target-left">
+              <div class="detail-logo-box" id="detail-event-logo">SA</div>
+              <div class="detail-target-info">
+                <h3 id="detail-event-title">IND VS SA</h3>
+                <p id="detail-event-subtitle">Ahamedabhad &bull; 2026-06-18 23:30:00</p>
+              </div>
+            </div>
+
+            <div class="warning-drift-badge" id="detail-event-status-pill">
+              <span class="status-dot" style="background-color: #f59e0b;"></span>
+              Lock Protection Active
+            </div>
+          </div>
+
+          <!-- Tabs Header Bar -->
+          <div class="tabs-nav-bar">
+            <button class="tab-btn active" data-tab="tab-seatmap">Interactive Seat Allocator</button>
+            <button class="tab-btn" data-tab="tab-queue-console">Virtual Queue Stream</button>
+            <button class="tab-btn" data-tab="tab-metrics">System Telemetry</button>
+          </div>
+
+          <!-- Tab Content Area -->
+          <div class="tab-content-area">
+            
+            <!-- Tab 1: Seat Map & Reservation Flow -->
+            <div class="tab-pane active" id="tab-seatmap">
+              
+              <!-- Two-box Status Grid -->
+              <div class="state-grid-two-col">
+                <div class="status-box broken" id="queue-box-left">
+                  <div class="box-top-row">
+                    <span class="box-label">Queue Gatekeeper</span>
+                    <span class="box-badge" style="color: #dc2626;">Token Required</span>
+                  </div>
+                  <div class="box-code-line">POST /api/reservations &rarr; X-Queue-Token</div>
+                  <div class="box-meta-footer">
+                    <span>Direct Access (Low Load) or FIFO Virtual Queue</span>
+                    <span>Zero Bypass Guard</span>
+                  </div>
+                </div>
+
+                <div class="status-box healed" id="queue-box-right">
+                  <div class="box-top-row">
+                    <span class="box-label">Redis Lock Guard</span>
+                    <span class="box-badge" style="color: #16a34a;">Distributed Lock: Idle</span>
+                  </div>
+                  <div class="box-code-line">seat:lock:EVENT:{seatNumber}</div>
+                  <div class="box-meta-footer">
+                    <span>Deadlock-free sorted atomic SET NX EX</span>
+                    <span>Lua Safe Unlock</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Anti-Scalping & Bot Mitigation Guard Card -->
+              <div class="security-shield-card">
+                <div class="shield-header-row">
+                  <div class="shield-title-group">
+                    <div class="shield-icon-badge">🛡️</div>
+                    <div>
+                      <div class="shield-title">Anti-Scalping &amp; Human Verification Guard</div>
+                      <div class="shield-subtitle">Real-time bot mitigation, Redis sliding burst limiter, and cryptographic puzzle verification.</div>
+                    </div>
+                  </div>
+                  <div class="pulse-badge">
+                    <span class="pulse-dot"></span>
+                    <span id="shield-live-status-text">Shield Engine: ACTIVE (STRICT)</span>
+                  </div>
+                </div>
+
+                <!-- Live Client Risk Score Meter -->
+                <div class="risk-meter-wrapper" style="margin-bottom: 12px;">
+                  <span style="font-size: 11.5px; font-weight: 600; color: var(--text-secondary); min-width: 140px;">
+                    Client Trust Assessment:
+                  </span>
+                  <div class="risk-meter-bar-outer">
+                    <div class="risk-meter-bar-fill" id="client-risk-bar" style="width: 100%;"></div>
+                  </div>
+                  <span class="risk-score-value" id="client-risk-label" style="color: #10b981;">0 / 100 (Safe)</span>
+                  <span class="verified-pill" id="client-bot-status-pill" style="font-size: 10px; background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0;">Clean Browser</span>
+                </div>
+
+                <!-- Interactive Captcha Verification Box -->
+                <div class="captcha-box" id="captcha-box-container">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 12px; font-weight: 600; color: var(--text-primary);">
+                      🔒 Step: Solve Challenge to Acquire Distributed Reservation Lock
+                    </span>
+                    <button class="btn-icon-soft" onclick="loadCaptchaChallenge()" title="Refresh Math Challenge" style="font-size: 11.5px; gap: 4px; padding: 4px 8px;">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+                      </svg>
+                      New Puzzle
+                    </button>
+                  </div>
+
+                  <div class="captcha-render-area">
+                    <div class="captcha-svg-container" id="captcha-svg-wrapper">
+                      <span style="font-size: 11px; color: var(--text-muted);">Loading challenge...</span>
+                    </div>
+
+                    <div class="captcha-controls">
+                      <input type="number" id="captcha-answer-input" class="captcha-input" placeholder="Enter math result..." autocomplete="off">
+                      <button class="btn-primary" id="btn-verify-captcha" onclick="submitCaptchaVerify()" style="height: 38px; padding: 0 14px; font-size: 12.5px; white-space: nowrap;">
+                        Verify Human
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="captcha-status-row">
+                    <span id="captcha-status-msg">Solve math equation to prove human identity and obtain HMAC security token.</span>
+                    <span class="verified-pill pending" id="captcha-verified-badge">Awaiting Solution</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Action Strip Row -->
+              <div class="action-strip-row">
+                <div class="action-strip-left">
+                  <button class="btn-secondary" onclick="joinVirtualQueue()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    Simulate Queue Token
+                  </button>
+                  <button class="btn-secondary" onclick="connectSseStream()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="2" y1="12" x2="22" y2="12"></line>
+                    </svg>
+                    Connect SSE Stream
+                  </button>
+                </div>
+
+                <button class="btn-green-solid" id="btn-reserve-seats" onclick="handleReserveSeats()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                  Reserve Selected Seats
+                </button>
+              </div>
+
+              <!-- Interactive Seat Map -->
+              <div class="seat-map-wrapper">
+                <div class="seat-legend-bar">
+                  <div class="legend-item"><div class="legend-swatch available"></div> Available</div>
+                  <div class="legend-item"><div class="legend-swatch selected"></div> Selected</div>
+                  <div class="legend-item"><div class="legend-swatch reserved"></div> Locked (TTL 5m)</div>
+                  <div class="legend-item"><div class="legend-swatch booked"></div> Booked</div>
+                </div>
+
+                <div class="seat-grid-container" id="seat-grid-container">
+                  <!-- Generated dynamically -->
+                </div>
+              </div>
+
+              <!-- Booking & Checkout Panel -->
+              <div class="checkout-summary-card" id="checkout-action-card" style="display: none; margin-top: 20px;">
+                <h4 style="font-size: 15px; font-weight: 700; margin-bottom: 12px; color: var(--text-primary);">Reservation Confirmation &amp; Payment</h4>
+                <div class="summary-row">
+                  <span>Selected Seats:</span>
+                  <strong id="summary-selected-seats">None</strong>
+                </div>
+                <div class="summary-row">
+                  <span>Total Amount:</span>
+                  <strong id="summary-total-price">₹0.00</strong>
+                </div>
+                <div class="summary-row">
+                  <span>Idempotency Protection:</span>
+                  <span class="badge-tag green">Idempotency-Key UUID Enabled</span>
+                </div>
+                <div class="summary-row">
+                  <span>Email Confirmation Pipeline:</span>
+                  <span class="badge-tag blue">RabbitMQ Async Worker (ticketflow.email.exchange)</span>
+                </div>
+                <div class="summary-row total">
+                  <span>Grand Total:</span>
+                  <span id="summary-total-price-2" style="color: var(--primary);">₹0.00</span>
+                </div>
+                <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
+                  <button class="btn-primary" id="btn-confirm-payment" onclick="handleConfirmBooking()" style="padding: 10px 24px; font-size: 14px;">
+                    Confirm Booking &amp; Pay
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Tab 2: Virtual Queue Live Stream Console -->
+            <div class="tab-pane" id="tab-queue-console">
+              <div class="terminal-console-card">
+                <div class="terminal-header">
+                  <div class="terminal-dots">
+                    <span class="dot red"></span>
+                    <span class="dot yellow"></span>
+                    <span class="dot green"></span>
+                  </div>
+                  <span style="font-size: 11.5px; color: #94a3b8;">/api/queue/stream &bull; Real-time Server-Sent Events</span>
+                  <button class="btn-icon-soft" style="color: #94a3b8; padding: 2px;" onclick="document.getElementById('terminal-log-body').innerHTML = ''" title="Clear Console">
+                    &empty;
+                  </button>
+                </div>
+                <div class="terminal-body" id="terminal-log-body">
+                  <!-- Live Log entries populated by JS -->
+                </div>
+              </div>
+
+              <div style="margin-top: 16px; display: flex; gap: 10px;">
+                <button class="btn-secondary" onclick="joinVirtualQueue()">Trigger Join Queue</button>
+                <button class="btn-secondary" onclick="connectSseStream()">Reconnect SSE Stream</button>
+              </div>
+            </div>
+
+            <!-- Tab 3: System Telemetry & Metrics -->
+            <div class="tab-pane" id="tab-metrics">
+              <div class="metrics-kpi-grid" style="margin-bottom: 20px;">
+                <div class="kpi-card">
+                  <div class="kpi-label">JVM THREADS</div>
+                  <div class="kpi-value-row">
+                    <span class="kpi-value" id="metric-threads-val">38 Active</span>
+                  </div>
+                  <div class="kpi-subtext">Thread Pool Execution</div>
+                </div>
+                <div class="kpi-card">
+                  <div class="kpi-label">SYSTEM CPU USAGE</div>
+                  <div class="kpi-value-row">
+                    <span class="kpi-value" id="metric-cpu-val">0.0%</span>
+                  </div>
+                  <div class="kpi-subtext">Low Overhead Engine</div>
+                </div>
+                <div class="kpi-card">
+                  <div class="kpi-label">HIKARI POOL CONNECTIONS</div>
+                  <div class="kpi-value-row">
+                    <span class="kpi-value">5 / 20</span>
+                  </div>
+                  <div class="kpi-subtext">Active MySQL Handshakes</div>
+                </div>
+                <div class="kpi-card">
+                  <div class="kpi-label">HEALTH PROBE</div>
+                  <div class="kpi-value-row">
+                    <span class="kpi-value" style="color: #10b981;">UP</span>
+                  </div>
+                  <div class="kpi-subtext">/actuator/health</div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- Receipt Modal -->
+<div class="modal-backdrop" id="receipt-modal">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h3>Booking Confirmation</h3>
+      <button class="btn-icon-soft" onclick="closeReceiptModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="booking-receipt-content">
+        <!-- Rendered by JS -->
+      </div>
+      <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
+        <button class="btn-primary" onclick="closeReceiptModal()">Close Receipt</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

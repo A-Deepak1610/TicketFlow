@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TicketFlow | Event Operations & High-Performance Ticketing Engine</title>
+  <meta name="description" content="High-performance, concurrent, and resilient event ticketing platform with virtual queue and distributed seat locking.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script>
+    // Immediate Role-Based Dispatcher
+    (function() {
+      const sessionStr = localStorage.getItem('ticketflow_session');
+      if (!sessionStr) {
+        window.location.replace('login.html');
+      } else {
+        try {
+          const sess = JSON.parse(sessionStr);
+          if (sess.role === 'ROLE_ADMIN') {
+            window.location.replace('admin.html');
+          } else {
+            window.location.replace('user.html');
+          }
+        } catch (e) {
+          window.location.replace('login.html');
+        }
+      }
+    })();
+  </script>
+</head>
+<body>
+
+<div id="app-container">
+  
+  <!-- Left Sidebar (AirGo Inspired) -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo-badge">TF</div>
+      <div class="logo-info">
+        <h1>TicketFlow</h1>
+        <p>Ticketing &amp; Queue Engine</p>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <!-- Section: Overview -->
+      <div class="nav-section-label">OVERVIEW</div>
+      <ul class="nav-items">
+        <li>
+          <a class="nav-link active" data-nav="dashboard" id="nav-item-dashboard">
+            <div class="nav-link-left">
+              <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+              </svg>
+              <span>Dashboard</span>
+            </div>
+          </a>
+        </li>
+      </ul>
+
+      <!-- Section: Data & Bookings -->
+      <div class="nav-section-label">BOOKING &amp; QUEUE</div>
+      <ul class="nav-items">
+        <li>
+          <a class="nav-link" data-nav="seats" id="nav-item-seats">
+            <div class="nav-link-left">
+              <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M4 18v3h16v-3M4 14h16M7 10h10M6 6h12"></path>
+              </svg>
+              <span>Seat Allocator</span>
+            </div>
+            <span class="nav-pill-count accent">Live</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-link" data-nav="queue" id="nav-item-queue">
+            <div class="nav-link-left">
+              <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+              </svg>
+              <span>Virtual Queue</span>
+            </div>
+            <span class="nav-pill-count">1.2k</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-link" data-nav="metrics" id="nav-item-metrics">
+            <div class="nav-link-left">
+              <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+              </svg>
+              <span>Data Telemetry</span>
+            </div>
+            <span class="nav-pill-count alert">4 ep</span>
+          </a>
+        </li>
+      </ul>
+
+      <!-- Section: Admin Management -->
+      <div class="nav-section-label" id="nav-admin-section">ADMIN &amp; SECURITY</div>
+      <ul class="nav-items" id="nav-admin-items">
+        <li>
+          <a class="nav-link" data-nav="security" id="nav-item-security">
+            <div class="nav-link-left">
+              <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+              </svg>
+              <span>Anti-Scalp Shield</span>
+            </div>
+            <span class="nav-pill-count" style="background-color: #ecfdf5; color: #047857; font-weight: 700;">Live</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-link" data-nav="admin" id="nav-item-admin">
+            <div class="nav-link-left">
+              <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+              <span>Event Scheduler</span>
+            </div>
+            <span class="nav-pill-count alert">Admin</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+
+    <!-- Bottom User Profile Card -->
+    <div class="sidebar-footer">
+      <div class="user-profile-card">
+        <div class="user-profile-left">
+          <div class="user-avatar admin-avatar" id="user-profile-avatar">VS</div>
+          <div class="user-name-role">
+            <h4 id="user-profile-name">Vikram Sharma</h4>
+            <span class="role-tag-pill admin" id="user-profile-role-tag">Platform Admin</span>
+          </div>
+        </div>
+        <button class="btn-icon-soft" title="Switch Account / Role" onclick="openLoginModal()" id="btn-sidebar-user-switch">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="8.5" cy="7" r="4"></circle>
+            <line x1="20" y1="8" x2="20" y2="14"></line>
+            <line x1="23" y1="11" x2="17" y2="11"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content Container -->
+  <main class="main-content">
+    
+    <!-- Top Navigation Bar -->
+    <header class="top-navbar">
+      <div class="navbar-left">
+        <div class="tag-badge-pill" id="top-badge-event-id">LIVE#6 - IND VS SA</div>
+        <div class="breadcrumbs">
+          TicketFlow / <span class="current">Dashboard</span>
+        </div>
+      </div>
+
+      <div class="navbar-right">
+        <div class="top-action-btn" title="Anti-Scalping Security Layer" onclick="switchTab('tab-security')" style="cursor: pointer;">
+          <span class="pulse-badge"><span class="pulse-dot"></span> Anti-Scalp: <strong id="top-policy-label">STRICT</strong></span>
+        </div>
+        <button class="top-action-btn" onclick="switchTab('tab-queue-console')">
+          <span>&gt;_ Queue Studio</span>
+        </button>
+        <div class="top-action-btn">
+          <span>📅 October 2026</span>
+        </div>
+        <div class="notification-bell-btn" title="Live Notifications">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+          </svg>
+          <span class="bell-badge-dot"></span>
+        </div>
+
+        <!-- User Role Switcher Pill -->
+        <div class="nav-user-pill" onclick="openLoginModal()" title="Click to Switch Role / Account">
+          <div class="user-avatar" style="width: 24px; height: 24px; font-size: 11px;">VS</div>
+          <span style="font-size: 12.5px; font-weight: 600;" id="top-nav-user">Vikram Sharma</span>
+          <span class="role-tag-pill admin" id="top-nav-role">Platform Admin</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Page Body -->
+    <div class="page-body">
+      
+      <!-- Page Title & Primary Actions Row -->
+      <div class="page-title-row">
+        <div>
+          <div class="title-with-badge">
+            <h2 class="page-title">Seat Manager &amp; Concurrency Engine</h2>
+            <span class="status-indicator-pill">
+              <span class="status-dot"></span>
+              Auto-Throttling Active
+            </span>
+          </div>
+          <p class="page-subtitle">Ultra-low latency seat allocation, distributed Redis locking, and automated virtual queue admission.</p>
+        </div>
+
+        <div class="title-actions">
+          <button class="btn-secondary" onclick="loadEvents()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+            </svg>
+            Scan Events
+          </button>
+          <button class="btn-primary" onclick="joinVirtualQueue()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            Live Queue Test
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI Metrics Row (Fleet Health Style from Reference Image) -->
+      <div class="metrics-kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">FLEET / EVENT HEALTH</div>
+          <div class="kpi-value-row">
+            <span class="kpi-value">99.9%</span>
+            <span class="kpi-status-badge">● Optimal</span>
+          </div>
+          <div class="kpi-subtext">All Quartz Schedulers Alive</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-label">OPERATIONAL EVENTS</div>
+          <div class="kpi-value-row">
+            <span class="kpi-value" id="kpi-operational-fleet">2 / 6</span>
+            <span class="kpi-status-badge amber">Sales Active</span>
+          </div>
+          <div class="kpi-subtext">Automated Status Transitions</div>
+        </div>
+
+        <div class="kpi-card" onclick="switchTab('tab-security')" style="cursor: pointer;" title="View Anti-Scalping Live Telemetry">
+          <div class="kpi-label">ANTI-SCALPING SHIELD</div>
+          <div class="kpi-value-row">
+            <span class="kpi-value" id="kpi-security-blocked">0 Blocked</span>
+            <span class="kpi-status-badge" style="background-color: #ecfdf5; color: #047857;" id="kpi-security-status">● Protected</span>
+          </div>
+          <div class="kpi-subtext" id="kpi-security-subtext">HMAC Captcha &amp; Rate Guard</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-label">CONCURRENCY SAFETY</div>
+          <div class="kpi-value-row">
+            <span class="kpi-value">100%</span>
+            <span class="kpi-status-badge">● Strict Live Data</span>
+          </div>
+          <div class="kpi-subtext">Redis Locks &amp; Versioning</div>
+        </div>
+      </div>
+
+      <!-- Dual-Panel Main Workspace (Target Fleet Layout from Image) -->
+      <div class="workspace-grid">
+        
+        <!-- Left Panel: Target Fleet / Event Selector -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title-group">
+              <span class="panel-title">TARGET EVENTS</span>
+              <span class="panel-count" id="events-count-badge">6 events</span>
+            </div>
+            <button class="btn-icon-soft" onclick="loadEvents()" title="Refresh List">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+              </svg>
+            </button>
+          </div>
+
+          <div class="panel-search-box">
+            <div class="search-input-wrapper">
+              <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="text" class="search-input" id="event-search-input" placeholder="Search event or venue...">
+            </div>
+          </div>
+
+          <ul class="event-list" id="events-target-list">
+            <!-- Event Items populated dynamically -->
+          </ul>
+        </div>
+
+        <!-- Right Panel: Detailed Management & Live Map (Detailed Card from Image) -->
+        <div class="panel-card">
+          
+          <!-- Detail Header -->
+          <div class="detail-header-card">
+            <div class="detail-target-left">
+              <div class="detail-logo-box" id="detail-event-logo">SA</div>
+              <div class="detail-target-info">
+                <h3 id="detail-event-title">IND VS SA</h3>
+                <p id="detail-event-subtitle">Ahamedabhad &bull; 2026-06-18 23:30:00</p>
+              </div>
+            </div>
+
+            <div class="warning-drift-badge" id="detail-event-status-pill">
+              <span class="status-dot" style="background-color: #f59e0b;"></span>
+              Lock Protection Active
+            </div>
+          </div>
+
+          <!-- Tabs Header Bar -->
+          <div class="tabs-nav-bar">
+            <button class="tab-btn active" data-tab="tab-seatmap">Interactive Seat Allocator</button>
+            <button class="tab-btn" data-tab="tab-queue-console">Virtual Queue Stream</button>
+            <button class="tab-btn" data-tab="tab-security" id="tab-btn-security">Anti-Scalp &amp; Bot Shield</button>
+            <button class="tab-btn" data-tab="tab-admin" id="tab-btn-admin">Admin Operations</button>
+            <button class="tab-btn" data-tab="tab-metrics">System Telemetry</button>
+          </div>
+
+          <!-- Tab Content Area -->
+          <div class="tab-content-area">
+            
+            <!-- Tab 1: Seat Map & Reservation Flow -->
+            <div class="tab-pane active" id="tab-seatmap">
+              
+              <!-- Two-box Status Grid (Broken vs Healed style from image) -->
+              <div class="state-grid-two-col">
+                <div class="status-box broken" id="queue-box-left">
+                  <div class="box-top-row">
+                    <span class="box-label">Queue Gatekeeper</span>
+                    <span class="box-badge" style="color: #dc2626;">Token Required</span>
+                  </div>
+                  <div class="box-code-line">POST /api/reservations &rarr; X-Queue-Token</div>
+                  <div class="box-meta-footer">
+                    <span>Direct Access (Low Load) or FIFO Virtual Queue</span>
+                    <span>Zero Bypass Guard</span>
+                  </div>
+                </div>
+
+                <div class="status-box healed" id="queue-box-right">
+                  <div class="box-top-row">
+                    <span class="box-label">Redis Lock Guard</span>
+                    <span class="box-badge" style="color: #16a34a;">Distributed Lock: Idle</span>
+                  </div>
+                  <div class="box-code-line">seat:lock:EVENT:{seatNumber}</div>
+                  <div class="box-meta-footer">
+                    <span>Deadlock-free sorted atomic SET NX EX</span>
+                    <span>Lua Safe Unlock</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Anti-Scalping & Bot Mitigation Guard Card -->
+              <div class="security-shield-card">
+                <div class="shield-header-row">
+                  <div class="shield-title-group">
+                    <div class="shield-icon-badge">🛡️</div>
+                    <div>
+                      <div class="shield-title">Anti-Scalping &amp; Human Verification Guard</div>
+                      <div class="shield-subtitle">Real-time bot mitigation, Redis sliding burst limiter, and cryptographic puzzle verification.</div>
+                    </div>
+                  </div>
+                  <div class="pulse-badge">
+                    <span class="pulse-dot"></span>
+                    <span id="shield-live-status-text">Shield Engine: ACTIVE (STRICT)</span>
+                  </div>
+                </div>
+
+                <!-- Live Client Risk Score Meter -->
+                <div class="risk-meter-wrapper" style="margin-bottom: 12px;">
+                  <span style="font-size: 11.5px; font-weight: 600; color: var(--text-secondary); min-width: 140px;">
+                    Client Trust Assessment:
+                  </span>
+                  <div class="risk-meter-bar-outer">
+                    <div class="risk-meter-bar-fill" id="client-risk-bar" style="width: 100%;"></div>
+                  </div>
+                  <span class="risk-score-value" id="client-risk-label" style="color: #10b981;">0 / 100 (Safe)</span>
+                  <span class="verified-pill" id="client-bot-status-pill" style="font-size: 10px; background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0;">Clean Browser</span>
+                </div>
+
+                <!-- Interactive Captcha Verification Box -->
+                <div class="captcha-box" id="captcha-box-container">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 12px; font-weight: 600; color: var(--text-primary);">
+                      🔒 Step: Solve Challenge to Acquire Distributed Reservation Lock
+                    </span>
+                    <button class="btn-icon-soft" onclick="loadCaptchaChallenge()" title="Refresh Math Challenge" style="font-size: 11.5px; gap: 4px; padding: 4px 8px;">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+                      </svg>
+                      New Puzzle
+                    </button>
+                  </div>
+
+                  <div class="captcha-render-area">
+                    <div class="captcha-svg-container" id="captcha-svg-wrapper">
+                      <span style="font-size: 11px; color: var(--text-muted);">Loading challenge...</span>
+                    </div>
+
+                    <div class="captcha-controls">
+                      <input type="number" id="captcha-answer-input" class="captcha-input" placeholder="Enter math result..." autocomplete="off">
+                      <button class="btn-primary" id="btn-verify-captcha" onclick="submitCaptchaVerify()" style="height: 38px; padding: 0 14px; font-size: 12.5px; white-space: nowrap;">
+                        Verify Human
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="captcha-status-row">
+                    <span id="captcha-status-msg">Solve math equation to prove human identity and obtain HMAC security token.</span>
+                    <span class="verified-pill pending" id="captcha-verified-badge">Awaiting Solution</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Action Strip Row -->
+              <div class="action-strip-row">
+                <div class="action-strip-left">
+                  <button class="btn-secondary" onclick="joinVirtualQueue()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    Simulate Queue Token
+                  </button>
+                  <button class="btn-secondary" onclick="connectSseStream()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="2" y1="12" x2="22" y2="12"></line>
+                    </svg>
+                    Connect SSE Stream
+                  </button>
+                </div>
+
+                <button class="btn-green-solid" id="btn-reserve-seats" onclick="handleReserveSeats()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                  Reserve Selected Seats
+                </button>
+              </div>
+
+              <!-- Interactive Seat Map -->
+              <div class="seat-map-wrapper">
+                <div class="seat-legend-bar">
+                  <div class="legend-item"><div class="legend-swatch available"></div> Available</div>
+                  <div class="legend-item"><div class="legend-swatch selected"></div> Selected</div>
+                  <div class="legend-item"><div class="legend-swatch reserved"></div> Locked (TTL 5m)</div>
+                  <div class="legend-item"><div class="legend-swatch booked"></div> Booked</div>
+                </div>
+
+                <div class="seat-grid-container" id="seat-grid-container">
+                  <!-- Generated dynamically -->
+                </div>
+              </div>
+
+              <!-- Booking & Checkout Panel -->
+              <div class="checkout-summary-card" id="checkout-action-card" style="display: none; margin-top: 20px;">
+                <h4 style="font-size: 15px; font-weight: 700; margin-bottom: 12px; color: var(--text-primary);">Reservation Confirmation &amp; Payment</h4>
+                <div class="summary-row">
+                  <span>Selected Seats:</span>
+                  <strong id="summary-selected-seats">None</strong>
+                </div>
+                <div class="summary-row">
+                  <span>Total Amount:</span>
+                  <strong id="summary-total-price">₹0.00</strong>
+                </div>
+                <div class="summary-row">
+                  <span>Idempotency Protection:</span>
+                  <span class="badge-tag green">Idempotency-Key UUID Enabled</span>
+                </div>
+                <div class="summary-row">
+                  <span>Email Confirmation Pipeline:</span>
+                  <span class="badge-tag blue">RabbitMQ Async Worker (ticketflow.email.exchange)</span>
+                </div>
+                <div class="summary-row total">
+                  <span>Grand Total:</span>
+                  <span id="summary-total-price-2" style="color: var(--primary);">₹0.00</span>
+                </div>
+                <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
+                  <button class="btn-primary" id="btn-confirm-payment" onclick="handleConfirmBooking()" style="padding: 10px 24px; font-size: 14px;">
+                    Confirm Booking &amp; Pay
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Tab 2: Virtual Queue Live Stream Console -->
+            <div class="tab-pane" id="tab-queue-console">
+              <div class="terminal-console-card">
+                <div class="terminal-header">
+                  <div class="terminal-dots">
+                    <span class="dot red"></span>
+                    <span class="dot yellow"></span>
+                    <span class="dot green"></span>
+                  </div>
+                  <span style="font-size: 11.5px; color: #94a3b8;">/api/queue/stream &bull; Real-time Server-Sent Events</span>
+                  <button class="btn-icon-soft" style="color: #94a3b8; padding: 2px;" onclick="document.getElementById('terminal-log-body').innerHTML = ''" title="Clear Console">
+                    &empty;
+                  </button>
+                </div>
+                <div class="terminal-body" id="terminal-log-body">
+                  <!-- Live Log entries populated by JS -->
+                </div>
+              </div>
+
+              <div style="margin-top: 16px; display: flex; gap: 10px;">
+                <button class="btn-secondary" onclick="joinVirtualQueue()">Trigger Join Queue</button>
+                <button class="btn-secondary" onclick="connectSseStream()">Reconnect SSE Stream</button>
+              </div>
+            </div>
+
+            <!-- Tab: Anti-Scalping & Bot Shield -->
+            <div class="tab-pane" id="tab-security">
+              <div style="margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                  <div>
+                    <h3 style="font-size: 16px; font-weight: 700; color: var(--text-primary);">Anti-Scalping Defense Engine &amp; Threat Audit</h3>
+                    <p style="font-size: 12.5px; color: var(--text-muted);">
+                      Multi-vector mitigation: Redis sliding-window burst limiter, automated bot detector, seat-hoarding prevention, and signed HMAC-SHA256 captchas.
+                    </p>
+                  </div>
+                  <button class="btn-secondary" onclick="loadSecurityStats(); loadScalperAuditLogs();" title="Refresh Telemetry">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+                    </svg>
+                    Refresh Audit Trail
+                  </button>
+                </div>
+
+                <!-- Policy Switcher Grid -->
+                <div class="policy-switcher-grid">
+                  <div class="policy-card active" id="policy-card-STRICT" onclick="setSecurityPolicy('STRICT')">
+                    <div class="policy-header">
+                      <span class="policy-name">STRICT (Recommended)</span>
+                      <span class="audit-badge blocked" style="font-size: 10px;">Max Security</span>
+                    </div>
+                    <p class="policy-desc">
+                      Burst Limit: 10 req/10s. Mandates cryptographic Captcha challenge on all reservations. Zero tolerance for automated scrapers.
+                    </p>
+                  </div>
+
+                  <div class="policy-card" id="policy-card-BALANCED" onclick="setSecurityPolicy('BALANCED')">
+                    <div class="policy-header">
+                      <span class="policy-name">BALANCED</span>
+                      <span class="audit-badge captcha" style="font-size: 10px;">Adaptive</span>
+                    </div>
+                    <p class="policy-desc">
+                      Burst Limit: 25 req/10s. Challenges traffic with risk score &ge; 40 or rapid rate spikes. Smooth flow for trusted users.
+                    </p>
+                  </div>
+
+                  <div class="policy-card" id="policy-card-PERMISSIVE" onclick="setSecurityPolicy('PERMISSIVE')">
+                    <div class="policy-header">
+                      <span class="policy-name">PERMISSIVE</span>
+                      <span class="audit-badge allow" style="font-size: 10px;">Relaxed</span>
+                    </div>
+                    <p class="policy-desc">
+                      Burst Limit: 60 req/10s. Captcha only triggered on confirmed automated bot user-agents or extreme hoarding attempts.
+                    </p>
+                  </div>
+                </div>
+
+                <!-- Security KPI Telemetry Grid -->
+                <div class="metrics-kpi-grid" style="margin-bottom: 20px;">
+                  <div class="kpi-card">
+                    <div class="kpi-label">TOTAL CHECKS EVALUATED</div>
+                    <div class="kpi-value-row">
+                      <span class="kpi-value" id="sec-kpi-total">0</span>
+                      <span class="kpi-status-badge blue">Real-time</span>
+                    </div>
+                    <div class="kpi-subtext">Requests analyzed by security shield</div>
+                  </div>
+
+                  <div class="kpi-card">
+                    <div class="kpi-label">BOT ATTACKS BLOCKED</div>
+                    <div class="kpi-value-row">
+                      <span class="kpi-value" id="sec-kpi-blocked" style="color: #ef4444;">0</span>
+                      <span class="kpi-status-badge alert">Throttled</span>
+                    </div>
+                    <div class="kpi-subtext">Automated tools &amp; scrapers stopped</div>
+                  </div>
+
+                  <div class="kpi-card">
+                    <div class="kpi-label">CAPTCHAS VERIFIED</div>
+                    <div class="kpi-value-row">
+                      <span class="kpi-value" id="sec-kpi-solved" style="color: #10b981;">0</span>
+                      <span class="kpi-status-badge" style="background-color: #ecfdf5; color: #047857;">HMAC Signed</span>
+                    </div>
+                    <div class="kpi-subtext">Humans authenticated successfully</div>
+                  </div>
+
+                  <div class="kpi-card">
+                    <div class="kpi-label">ACTIVE MITIGATION POLICY</div>
+                    <div class="kpi-value-row">
+                      <span class="kpi-value" id="sec-kpi-policy">STRICT</span>
+                      <span class="kpi-status-badge">● Active</span>
+                    </div>
+                    <div class="kpi-subtext">Dynamically configurable via API</div>
+                  </div>
+                </div>
+
+                <!-- Bot Mitigation Live Simulator (Testing Panel) -->
+                <div class="simulator-box">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span style="font-size: 15px;">⚡</span>
+                      <strong style="font-size: 13.5px; color: var(--text-primary);">Interactive Bot Mitigation Simulator</strong>
+                    </div>
+                    <span style="font-size: 11px; color: var(--text-muted);">Simulate real attack vectors against server</span>
+                  </div>
+
+                  <div class="simulator-actions-grid">
+                    <button class="btn-simulator" onclick="runAttackSimulation('BOT_USER_AGENT')">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                      </svg>
+                      <div>
+                        <div>Simulate Bot Scraper</div>
+                        <div style="font-size: 10.5px; color: var(--text-muted); font-weight: 400;">Puppeteer / Requests UA (100% Risk)</div>
+                      </div>
+                    </button>
+
+                    <button class="btn-simulator" onclick="runAttackSimulation('BURST_RATE')">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                        <polyline points="17 6 23 6 23 12"></polyline>
+                      </svg>
+                      <div>
+                        <div>Simulate Rapid Burst Attack</div>
+                        <div style="font-size: 10.5px; color: var(--text-muted); font-weight: 400;">12 rapid requests to trip rate limiter</div>
+                      </div>
+                    </button>
+
+                    <button class="btn-simulator" onclick="runAttackSimulation('SEAT_HOARD')">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="9" y1="9" x2="15" y2="15"></line>
+                        <line x1="15" y1="9" x2="9" y2="15"></line>
+                      </svg>
+                      <div>
+                        <div>Simulate Hoarding Attack</div>
+                        <div style="font-size: 10.5px; color: var(--text-muted); font-weight: 400;">Excessive seat allocation attempt (&gt; 4)</div>
+                      </div>
+                    </button>
+                  </div>
+
+                  <div id="simulator-console-output" style="margin-top: 12px; background-color: #0f172a; color: #38bdf8; padding: 12px 14px; border-radius: var(--radius-sm); font-family: 'JetBrains Mono', monospace; font-size: 11.5px; display: none; white-space: pre-wrap;">
+                  </div>
+                </div>
+
+                <!-- Scalper Audit Logs Table -->
+                <div class="audit-table-wrapper">
+                  <div class="audit-table-header">
+                    <div>
+                      <strong style="font-size: 13.5px; color: var(--text-primary);">Real-time Scalper Audit Trail (MySQL Table: scalper_audit_logs)</strong>
+                      <div style="font-size: 11px; color: var(--text-muted);">Immutable audit of evaluated requests, threat scoring, and mitigation actions.</div>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                      <button class="btn-secondary" style="font-size: 11.5px; padding: 4px 10px;" onclick="loadScalperAuditLogs()">
+                        Refresh Audit
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style="overflow-x: auto;">
+                    <table class="audit-table">
+                      <thead>
+                        <tr>
+                          <th>Timestamp</th>
+                          <th>Client IP</th>
+                          <th>User</th>
+                          <th>Risk Score</th>
+                          <th>Action</th>
+                          <th>Triggered Rule / Reason</th>
+                          <th>Details</th>
+                        </tr>
+                      </thead>
+                      <tbody id="scalper-audit-tbody">
+                        <tr>
+                          <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">Loading live security audit records...</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- Tab 3: Admin Operations -->
+            <div class="tab-pane" id="tab-admin">
+              <div style="background-color: #f8fafc; border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: 20px; margin-bottom: 20px;">
+                <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 6px;">Schedule New Event (Quartz Engine)</h3>
+                <p style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 16px;">
+                  Schedules automated <code style="color: #2563eb;">OpenBookingJob</code> (status &rarr; OPEN) and <code style="color: #dc2626;">CloseBookingJob</code> (status &rarr; CLOSED) stored durably in MySQL.
+                </p>
+
+                <form id="create-event-form">
+                  <div class="admin-form-grid">
+                    <div class="form-group">
+                      <label class="form-label">Event Title</label>
+                      <input type="text" name="eventName" class="form-input" placeholder="e.g. IND VS ENG Semi-Final" required>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Venue</label>
+                      <input type="text" name="venueName" class="form-input" placeholder="e.g. Wankhede Stadium, Mumbai" required>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Total Seats Capacity</label>
+                      <input type="number" name="totalSeats" class="form-input" value="50" min="1" max="1000" required>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Event Date &amp; Time</label>
+                      <input type="datetime-local" name="eventDate" class="form-input" value="2026-11-20T19:30" required>
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                      <label class="form-label">Sales Start Time (Quartz Trigger)</label>
+                      <input type="datetime-local" name="saleStartTime" class="form-input" value="2026-10-15T12:30" required>
+                    </div>
+                  </div>
+                  <button type="submit" class="btn-primary">
+                    Create &amp; Schedule Event
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            <!-- Tab 4: System Telemetry & Metrics -->
+            <div class="tab-pane" id="tab-metrics">
+              <div class="metrics-kpi-grid" style="margin-bottom: 20px;">
+                <div class="kpi-card">
+                  <div class="kpi-label">JVM THREADS</div>
+                  <div class="kpi-value-row">
+                    <span class="kpi-value" id="metric-threads-val">38 Active</span>
+                  </div>
+                  <div class="kpi-subtext">Thread Pool Execution</div>
+                </div>
+                <div class="kpi-card">
+                  <div class="kpi-label">SYSTEM CPU USAGE</div>
+                  <div class="kpi-value-row">
+                    <span class="kpi-value" id="metric-cpu-val">0.0%</span>
+                  </div>
+                  <div class="kpi-subtext">Low Overhead Engine</div>
+                </div>
+                <div class="kpi-card">
+                  <div class="kpi-label">HIKARI POOL CONNECTIONS</div>
+                  <div class="kpi-value-row">
+                    <span class="kpi-value">5 / 20</span>
+                  </div>
+                  <div class="kpi-subtext">Active MySQL Handshakes</div>
+                </div>
+                <div class="kpi-card">
+                  <div class="kpi-label">HEALTH PROBE</div>
+                  <div class="kpi-value-row">
+                    <span class="kpi-value" style="color: #10b981;">UP</span>
+                  </div>
+                  <div class="kpi-subtext">/actuator/health</div>
+                </div>
+              </div>
+
+              <div class="terminal-console-card">
+                <div class="terminal-header">
+                  <span style="font-size: 11.5px; color: #94a3b8;">Prometheus Metric Descriptors</span>
+                  <button class="btn-icon-soft" style="color: #94a3b8; font-size: 11px;" onclick="refreshMetrics()">Refresh Now</button>
+                </div>
+                <div class="terminal-body" style="font-size: 12px; color: #94a3b8;">
+                  <div>&bull; <strong>queue.decision.total</strong>: Counters tracking DIRECT vs QUEUE admissions.</div>
+                  <div>&bull; <strong>queue.load.factor</strong>: Dynamic capacity gauge basis points (0 to 10,000).</div>
+                  <div>&bull; <strong>tasks.scheduled.execution</strong>: Duration of background cleanup and token expiration jobs.</div>
+                  <div>&bull; <strong>hikaricp.connections</strong>: Pool active, idle, pending, and total connections.</div>
+                  <div>&bull; <strong>rabbitmq.message.delivery</strong>: Decoupled out-of-band email notifications.</div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- Login & Role Switcher Modal -->
+<div class="modal-backdrop" id="login-modal">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h3>Select Role &amp; Login Details</h3>
+      <button class="btn-icon-soft" onclick="closeLoginModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
+        Switch seamlessly between <strong>Platform Admin</strong> and <strong>Standard User</strong> to test role-based capabilities:
+      </p>
+
+      <div class="quick-login-credentials">
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">VERIFIED DEMO CREDENTIALS:</div>
+        
+        <div class="quick-btn-row">
+          <button class="btn-demo-login admin-demo" onclick="switchRole('admin')">
+            <span class="role-tag-pill admin">Platform Admin</span>
+            <span style="margin-top: 4px; font-size: 11px;">flow_admin / password123</span>
+            <span style="font-size: 10px; color: var(--text-muted);">Event Scheduler &amp; Control</span>
+          </button>
+
+          <button class="btn-demo-login" onclick="switchRole('user')">
+            <span class="role-tag-pill user">Standard User</span>
+            <span style="margin-top: 4px; font-size: 11px;">flow_user / password123</span>
+            <span style="font-size: 10px; color: var(--text-muted);">Queue &amp; Seat Booking</span>
+          </button>
+        </div>
+      </div>
+
+      <form id="custom-login-form" onsubmit="event.preventDefault(); loginUser(this.userName.value, this.password.value);">
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label class="form-label">Username</label>
+          <input type="text" name="userName" class="form-input" id="login-username" value="flow_admin" required>
+        </div>
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label class="form-label">Password</label>
+          <input type="password" name="password" class="form-input" id="login-password" value="password123" required>
+        </div>
+        <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">
+          Authenticate Session
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Receipt Modal -->
+<div class="modal-backdrop" id="receipt-modal">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h3>Booking Confirmation</h3>
+      <button class="btn-icon-soft" onclick="closeReceiptModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="booking-receipt-content">
+        <!-- Rendered by JS -->
+      </div>
+      <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
+        <button class="btn-primary" onclick="closeReceiptModal()">Close Receipt</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
