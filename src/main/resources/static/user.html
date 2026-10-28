@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TicketFlow | Event Ticketing &amp; Seat Reservation</title>
+  <meta name="description" content="Consumer ticket booking portal with interactive seat selection, anti-scalp Google reCAPTCHA, and real-time SSE seat updates.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  
+  <!-- Google reCAPTCHA v3 API -->
+  <script src="https://www.google.com/recaptcha/api.js?render=6LepXwUuAAAAAPvDP5BY6nVP6qhj4VGNILqamDFv"></script>
+
+  <script>
+    // Route Guard: Ensure Authenticated Session
+    (function() {
+      const sessionStr = localStorage.getItem('ticketflow_session');
+      if (!sessionStr) {
+        window.location.replace('login.html');
+      }
+    })();
+  </script>
+</head>
+<body>
+
+<div id="app-container">
+  
+  <!-- Left Sidebar (ONLY 2 Items: Dashboard and Event Booking) -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo-badge">TF</div>
+      <div class="logo-info">
+        <h1>TicketFlow</h1>
+        <p>Consumer Ticketing</p>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">PORTAL NAVIGATION</div>
+      <ul class="nav-items">
+        <li>
+          <a class="nav-link active" id="user-nav-dashboard" onclick="switchUserSection('dashboard')">
+            <div class="nav-link-left">
+              <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="9"></rect>
+                <rect x="14" y="3" width="7" height="5"></rect>
+                <rect x="14" y="12" width="7" height="9"></rect>
+                <rect x="3" y="16" width="7" height="5"></rect>
+              </svg>
+              <span>Dashboard</span>
+            </div>
+            <span class="nav-pill-count" id="badge-my-bookings-count">0</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-link" id="user-nav-booking" onclick="switchUserSection('booking')">
+            <div class="nav-link-left">
+              <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 18v3h16v-3M4 14h16M7 10h10M6 6h12"></path>
+              </svg>
+              <span>Event Booking</span>
+            </div>
+            <span class="nav-pill-count accent">Live</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+
+    <!-- Bottom User Profile Card -->
+    <div class="sidebar-footer">
+      <div class="user-profile-card">
+        <div class="user-profile-left">
+          <div class="user-avatar" id="user-profile-avatar">DA</div>
+          <div class="user-name-role">
+            <h4 id="user-profile-name">Deepak A.</h4>
+            <span class="role-tag-pill user" id="user-profile-role-tag">Verified User</span>
+          </div>
+        </div>
+        <button class="btn-icon-soft" title="Logout Session" onclick="logoutUser()" id="btn-sidebar-logout" style="color: #ef4444;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content Area -->
+  <main class="main-content">
+    
+    <!-- Top Navigation Bar -->
+    <header class="top-navbar">
+      <div class="navbar-left">
+        <div class="tag-badge-pill" id="top-badge-portal-status">CONSUMER PORTAL</div>
+        <div class="breadcrumbs">
+          TicketFlow / <span class="current" id="top-breadcrumb-section">Dashboard</span>
+        </div>
+      </div>
+
+      <div class="navbar-right">
+        <!-- Google reCAPTCHA Protection Badge -->
+        <div class="top-action-btn" title="Anti-Scalping Scalper Mitigation Active">
+          <span class="pulse-badge">
+            <span class="pulse-dot" style="background-color: #10b981;"></span>
+            Scalp Defense: <strong>Google reCAPTCHA v2</strong>
+          </span>
+        </div>
+
+        <!-- Real-Time SSE Indicator -->
+        <div class="top-action-btn" id="sse-connection-pill" title="Live Server-Sent Events Channel">
+          <span class="status-indicator-pill" style="font-size: 11.5px; padding: 4px 10px;">
+            <span class="status-dot" id="sse-dot-indicator"></span>
+            <span id="sse-status-label">SSE Sync Active</span>
+          </span>
+        </div>
+
+        <button class="btn-logout" onclick="logoutUser()" title="Sign Out of Session">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+          Sign Out
+        </button>
+
+        <div class="nav-user-pill" title="Current User Session">
+          <div class="user-avatar" style="width: 24px; height: 24px; font-size: 11px;">DA</div>
+          <span style="font-size: 12.5px; font-weight: 600;" id="top-nav-user">Deepak A.</span>
+          <span class="role-tag-pill user">User</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Page Body -->
+    <div class="page-body">
+
+      <!-- ================================================================= -->
+      <!-- VIEW 1: USER DASHBOARD (My Bookings & Overview)                    -->
+      <!-- ================================================================= -->
+      <section id="view-user-dashboard" class="user-view-pane active">
+        
+        <!-- Welcome Banner -->
+        <div class="page-title-row" style="margin-bottom: 20px;">
+          <div>
+            <div class="title-with-badge">
+              <h2 class="page-title">Welcome back, <span id="dash-greeting-name">Deepak</span> 👋</h2>
+              <span class="status-indicator-pill">
+                <span class="status-dot"></span>
+                Human Verified
+              </span>
+            </div>
+            <p class="page-subtitle">Track your confirmed event tickets, access digital gate passes, and discover live event sales.</p>
+          </div>
+
+          <div class="title-actions">
+            <button class="btn-primary" onclick="switchUserSection('booking')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              Book New Tickets
+            </button>
+          </div>
+        </div>
+
+        <!-- Dashboard KPI Stats Row -->
+        <div class="dashboard-kpi-row">
+          <div class="user-stat-card">
+            <div class="stat-label">TOTAL BOOKED TICKETS</div>
+            <div class="stat-val" id="dash-stat-ticket-count">0</div>
+            <div class="stat-sub">Confirmed Seats across events</div>
+          </div>
+
+          <div class="user-stat-card">
+            <div class="stat-label">REGISTERED EVENTS</div>
+            <div class="stat-val" id="dash-stat-events-count">0</div>
+            <div class="stat-sub">Upcoming bookings active</div>
+          </div>
+
+          <div class="user-stat-card">
+            <div class="stat-label">TOTAL AMOUNT PAID</div>
+            <div class="stat-val" style="color: var(--primary);" id="dash-stat-total-spent">₹0.00</div>
+            <div class="stat-sub">Processed through Payment Gateway</div>
+          </div>
+
+          <div class="user-stat-card">
+            <div class="stat-label">EMAIL NOTIFICATION RECIPIENT</div>
+            <div class="stat-val" style="font-size: 14px; word-break: break-all; color: #059669;" id="dash-stat-email">deepaka.ad24@bitsathy.ac.in</div>
+            <div class="stat-sub">RabbitMQ Dispatch Destination</div>
+          </div>
+        </div>
+
+        <!-- Booked Events & Tickets Section -->
+        <div class="panel-card" style="margin-top: 10px;">
+          <div class="panel-header">
+            <div class="panel-title-group">
+              <span class="panel-title">MY BOOKED EVENTS &amp; DIGITAL TICKETS</span>
+              <span class="panel-count" id="dash-booked-badge">0 Bookings</span>
+            </div>
+            <button class="btn-icon-soft" onclick="loadUserBookings()" title="Refresh Bookings">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Container where Booked Tickets Cards are injected -->
+          <div id="user-booked-tickets-container" class="booked-tickets-grid">
+            <div style="grid-column: 1 / -1; padding: 40px 20px; text-align: center; color: var(--text-muted);">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom: 12px; color: #cbd5e1;">
+                <path d="M4 18v3h16v-3M4 14h16M7 10h10M6 6h12"></path>
+              </svg>
+              <h4 style="font-size: 15px; color: var(--text-primary); margin-bottom: 6px;">No Bookings Found Yet</h4>
+              <p style="font-size: 13px; margin-bottom: 16px;">You haven't reserved tickets for any events yet.</p>
+              <button class="btn-primary" onclick="switchUserSection('booking')">Browse Live Events</button>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- VIEW 2: EVENT BOOKING PAGE (Cards -> Queue/Direct -> Seats -> Pay) -->
+      <!-- ================================================================= -->
+      <section id="view-user-booking" class="user-view-pane" style="display: none;">
+        
+        <!-- Booking Step 1: Events Catalog in Card Format -->
+        <div id="booking-step-events-catalog">
+          <div class="page-title-row">
+            <div>
+              <div class="title-with-badge">
+                <h2 class="page-title">Live Events &amp; Ticket Sales</h2>
+                <span class="status-indicator-pill">
+                  <span class="status-dot"></span>
+                  Real-Time Availability
+                </span>
+              </div>
+              <p class="page-subtitle">Select an event below to check seat availability or enter the virtual queue system.</p>
+            </div>
+
+            <div class="title-actions">
+              <button class="btn-secondary" onclick="loadEvents()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+                </svg>
+                Refresh Events
+              </button>
+            </div>
+          </div>
+
+          <!-- Events Search Bar -->
+          <div class="panel-search-box" style="margin-top: 10px; margin-bottom: 14px;">
+            <div class="search-input-wrapper">
+              <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="text" class="search-input" id="user-booking-search-input" placeholder="Search events by title or stadium venue..." oninput="filterEventsCards()">
+            </div>
+          </div>
+
+          <!-- Cards Grid -->
+          <div class="events-cards-grid" id="events-cards-display-container">
+            <!-- Populated via JavaScript dynamically -->
+          </div>
+        </div>
+
+        <!-- Booking Step 2: Virtual Queue Waiting Room Screen (Shown only when in queue) -->
+        <div id="booking-step-queue-room" style="display: none;">
+          <div class="queue-waiting-screen">
+            <div class="queue-radar-box">
+              <div class="queue-radar-pulse"></div>
+              <div class="queue-radar-core">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                </svg>
+              </div>
+            </div>
+
+            <span class="status-indicator-pill" style="margin-bottom: 8px;">
+              <span class="status-dot"></span>
+              Virtual Queue Gatekeeper Active
+            </span>
+
+            <h3 style="font-size: 22px; font-weight: 800; color: var(--text-primary); margin-top: 10px;" id="queue-event-name">Event Waitlist</h3>
+            <p style="font-size: 13.5px; color: var(--text-secondary); max-width: 440px; margin: 8px auto 20px;">
+              High demand detected. You have been placed in the waiting line to protect system integrity. You will automatically enter seat selection when admitted!
+            </p>
+
+            <div class="queue-pos-number" id="queue-wait-position">#--</div>
+            <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">YOUR POSITION IN LINE</div>
+
+            <div class="queue-info-chips">
+              <div class="queue-info-chip">⏱️ Est. Wait: <strong id="queue-wait-time">Calculating...</strong></div>
+              <div class="queue-info-chip">🛡️ Queue Mode: <strong id="queue-mode-label">SOFT_QUEUE</strong></div>
+              <div class="queue-info-chip">📡 SSE Stream: <strong style="color: #059669;">Connected</strong></div>
+            </div>
+
+            <div style="margin-top: 24px; display: flex; justify-content: center; gap: 12px;">
+              <button class="btn-secondary" onclick="cancelQueueWait()">Leave Queue</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Booking Step 3: Interactive Seat Map & Scalping Mitigation (reCAPTCHA) -->
+        <div id="booking-step-seatmap" style="display: none;">
+          
+          <!-- Event Header Strip -->
+          <div class="panel-card" style="margin-bottom: 20px; padding: 18px 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+              <div style="display: flex; align-items: center; gap: 14px;">
+                <button class="btn-secondary" onclick="returnToEventsCatalog()" style="padding: 6px 12px; font-size: 12px;">
+                  &larr; Back to Events
+                </button>
+                <div>
+                  <h3 style="font-size: 18px; font-weight: 800; color: var(--text-primary);" id="seatmap-event-title">IND VS SA</h3>
+                  <p style="font-size: 12.5px; color: var(--text-secondary);" id="seatmap-event-sub">Ahamedabhad &bull; 2026-06-18 23:30</p>
+                </div>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span class="status-indicator-pill" style="font-size: 11.5px;">
+                  <span class="status-dot"></span>
+                  <span id="seatmap-token-status">Queue Token: Valid</span>
+                </span>
+                <span class="event-status-tag open" id="seatmap-sales-status">OPEN</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Main Seat Map Workspace Grid -->
+          <div class="workspace-grid">
+            
+            <!-- Left: Interactive Seat Grid & Cinema/Stadium Banner -->
+            <div class="panel-card">
+              <div class="panel-header">
+                <span class="panel-title">SELECT YOUR SEATS</span>
+                <span class="panel-count" id="seat-selection-limit-badge">Max 4 Seats</span>
+              </div>
+
+              <!-- Stage / Screen Banner -->
+              <div class="stadium-stage-banner">
+                STADIUM PITCH &amp; MAIN STAGE THIS WAY
+              </div>
+
+              <!-- Seat Map Legend -->
+              <div class="seat-legend-bar" style="justify-content: center; margin-bottom: 20px;">
+                <div class="legend-item"><div class="legend-swatch available"></div> Available</div>
+                <div class="legend-item"><div class="legend-swatch selected"></div> Selected</div>
+                <div class="legend-item"><div class="legend-swatch reserved"></div> Locked (TTL 5m)</div>
+                <div class="legend-item"><div class="legend-swatch booked"></div> Booked</div>
+              </div>
+
+              <!-- Dynamic Seat Grid -->
+              <div class="seat-grid-container" id="user-seat-grid-container" style="max-height: 480px; overflow-y: auto;">
+                <!-- Generated dynamically by JS -->
+              </div>
+            </div>
+
+            <!-- Right: Order Summary & Google reCAPTCHA & Reserve Action -->
+            <div class="panel-card" style="display: flex; flex-direction: column; justify-content: space-between;">
+              <div>
+                <div class="panel-header">
+                  <span class="panel-title">SEAT SELECTION SUMMARY</span>
+                </div>
+
+                <div style="margin-bottom: 16px;">
+                  <div style="font-size: 12.5px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px;">Selected Seats:</div>
+                  <div id="user-selected-seats-chips" class="seat-pills-wrap">
+                    <span style="font-size: 12px; color: var(--text-muted);">No seats selected yet. Click any green seat above.</span>
+                  </div>
+                </div>
+
+                <div class="payment-summary-box">
+                  <div class="payment-summary-row">
+                    <span>Seats Count:</span>
+                    <strong id="summary-seats-count">0</strong>
+                  </div>
+                  <div class="payment-summary-row">
+                    <span>Base Ticket Price:</span>
+                    <strong id="summary-unit-price">₹0.00</strong>
+                  </div>
+                  <div class="payment-summary-row total-row">
+                    <span>Total Amount:</span>
+                    <span style="color: var(--primary);" id="summary-total-amount">₹0.00</span>
+                  </div>
+                </div>
+
+                <!-- Google reCAPTCHA v3 Anti-Scalping Mitigation -->
+                <div class="recaptcha-wrapper-box" id="recaptcha-shield-container">
+                  <div class="recaptcha-header-row">
+                    <span style="display: flex; align-items: center; gap: 7px;">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                      </svg>
+                      <span>ANTI-SCALPING BOT DEFENSE</span>
+                    </span>
+                    <span class="verified-pill" id="recaptcha-status-badge" style="background: #ecfdf5; color: #047857; border-color: #a7f3d0;">
+                      <span class="live-dot" style="background:#10b981; width:7px; height:7px; display:inline-block; border-radius:50%; margin-right:4px;"></span>
+                      reCAPTCHA v3 Active
+                    </span>
+                  </div>
+                  <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 4px; line-height: 1.4;">
+                    Invisible Google reCAPTCHA v3 risk analysis protects against automated scalper bots. Human score is verified automatically upon seat reservation.
+                  </div>
+                </div>
+
+                <!-- Active Reservation Hold Timer (shown when reserved) -->
+                <div id="reservation-countdown-bar" style="display: none; background: #fffbeb; border: 1px solid #fde68a; border-radius: var(--radius-md); padding: 12px; margin-bottom: 14px; text-align: center;">
+                  <div style="font-size: 11.5px; font-weight: 700; color: #b45309; text-transform: uppercase;">SEATS RESERVED &amp; LOCKED</div>
+                  <div style="font-size: 26px; font-weight: 800; color: #d97706; font-family: 'JetBrains Mono', monospace;" id="reservation-timer-display">05:00</div>
+                  <div style="font-size: 11px; color: #92400e;">Complete mock payment before the distributed lock expires.</div>
+                </div>
+              </div>
+
+              <!-- Action Buttons -->
+              <div style="margin-top: 16px;">
+                <!-- Step A: Reserve Seats Button -->
+                <button class="btn-buy-ticket" id="btn-reserve-seats-action" onclick="executeSeatReservation()" style="background-color: #059669; margin-bottom: 8px;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                  </svg>
+                  Reserve Selected Seats
+                </button>
+
+                <!-- Step B: Proceed to Payment Button (Enabled once reserved) -->
+                <button class="btn-buy-ticket" id="btn-proceed-payment-modal" onclick="openPaymentModal()" style="display: none;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                    <line x1="1" y1="10" x2="23" y2="10"></line>
+                  </svg>
+                  Proceed to Payment (₹<span id="btn-pay-amount-label">0.00</span>)
+                </button>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<!-- ======================================================================= -->
+<!-- MODAL 1: MOCK PAYMENT MODAL                                             -->
+<!-- ======================================================================= -->
+<div class="modal-overlay" id="mock-payment-modal">
+  <div class="modal-container">
+    <div class="modal-header-bar">
+      <h3>Mock Payment &amp; Confirmation</h3>
+      <button class="btn-icon-soft" onclick="closePaymentModal()">&times;</button>
+    </div>
+
+    <div class="modal-content-body">
+      <!-- Order Summary in Modal -->
+      <div class="payment-summary-box">
+        <div class="payment-summary-row">
+          <span>Event:</span>
+          <strong id="modal-pay-event-name">Event Title</strong>
+        </div>
+        <div class="payment-summary-row">
+          <span>Reserved Seats:</span>
+          <strong id="modal-pay-seats">A1, A2</strong>
+        </div>
+        <div class="payment-summary-row total-row">
+          <span>Amount Payable:</span>
+          <span style="color: var(--primary);" id="modal-pay-total">₹0.00</span>
+        </div>
+      </div>
+
+      <!-- RabbitMQ Email Dispatch Notice -->
+      <div class="rabbitmq-notice-box">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+          <polyline points="22,6 12,13 2,6"></polyline>
+        </svg>
+        <div>
+          <div style="font-weight: 700; margin-bottom: 2px;">RabbitMQ Email Pipeline</div>
+          <div>Upon payment confirmation, a booking email will be published to the message broker for: <strong>deepaka.ad24@bitsathy.ac.in</strong></div>
+        </div>
+      </div>
+
+      <!-- Payment Method Tabs -->
+      <div class="payment-method-tabs">
+        <div class="payment-tab active" onclick="selectPayTab(this, 'card')">Credit / Debit Card</div>
+        <div class="payment-tab" onclick="selectPayTab(this, 'upi')">UPI / GPay</div>
+        <div class="payment-tab" onclick="selectPayTab(this, 'netbanking')">Net Banking</div>
+      </div>
+
+      <!-- Card Form -->
+      <form id="mock-payment-form" onsubmit="executeConfirmBookingPayment(event)">
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label class="form-label">Cardholder Name</label>
+          <input type="text" class="form-input" id="pay-card-name" value="Deepak A" required>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label class="form-label">Card Number</label>
+          <input type="text" class="form-input" id="pay-card-num" value="4111 2222 3333 4444" required>
+        </div>
+
+        <div class="form-row-two" style="margin-bottom: 20px;">
+          <div class="form-group">
+            <label class="form-label">Expiry (MM/YY)</label>
+            <input type="text" class="form-input" value="12/28" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">CVV</label>
+            <input type="password" class="form-input" value="888" maxlength="3" required>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-buy-ticket" id="btn-submit-payment" style="height: 42px; font-size: 14px;">
+          <span id="btn-pay-text">Pay &amp; Finalize Booking</span>
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================================= -->
+<!-- MODAL 2: DIGITAL TICKET PASS MODAL                                      -->
+<!-- ======================================================================= -->
+<div class="modal-overlay" id="digital-ticket-modal">
+  <div class="modal-container" style="max-width: 480px;">
+    <div class="modal-header-bar">
+      <h3>Official Digital Ticket Pass</h3>
+      <button class="btn-icon-soft" onclick="closeDigitalTicketModal()">&times;</button>
+    </div>
+
+    <div class="modal-content-body" style="padding: 16px;">
+      <div class="digital-ticket-wrapper">
+        <div class="ticket-notch-left"></div>
+        <div class="ticket-notch-right"></div>
+
+        <div class="digital-ticket-top">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <span style="font-size: 11px; font-weight: 700; letter-spacing: 1px; color: #94a3b8; text-transform: uppercase;">TicketFlow Boarding Pass</span>
+            <span class="event-status-tag open" style="background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981;">VERIFIED</span>
+          </div>
+
+          <h3 style="font-size: 20px; font-weight: 800; color: #ffffff;" id="pass-event-name">Event Name</h3>
+          <div style="font-size: 13px; color: #cbd5e1; margin-top: 4px;" id="pass-venue-date">Venue &bull; Date</div>
+        </div>
+
+        <div class="digital-ticket-body">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+            <div>
+              <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">ATTENDEE</div>
+              <div style="font-size: 14px; font-weight: 700; color: var(--text-primary);" id="pass-attendee-name">Deepak A</div>
+            </div>
+            <div>
+              <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">BOOKING REF</div>
+              <div style="font-size: 14px; font-weight: 800; color: var(--primary); font-family: 'JetBrains Mono', monospace;" id="pass-booking-ref">TF-2026-XXXX</div>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 14px;">
+            <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">ASSIGNED SEATS</div>
+            <div id="pass-seats-container" class="seat-pills-wrap" style="margin-top: 4px;">
+              <span class="seat-pill">A1</span>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; font-size: 13px; padding-top: 10px; border-top: 1px dashed var(--border-default);">
+            <span style="color: var(--text-secondary);">Confirmation Email Dispatched To:</span>
+            <strong style="color: #059669;" id="pass-email">deepaka.ad24@bitsathy.ac.in</strong>
+          </div>
+
+          <!-- Barcode Preview -->
+          <div class="barcode-preview-box">
+            <svg viewBox="0 0 100 24" width="180" height="42" style="margin: 0 auto; display: block;">
+              <rect x="0" y="0" width="3" height="24" fill="#0f172a"/>
+              <rect x="5" y="0" width="2" height="24" fill="#0f172a"/>
+              <rect x="9" y="0" width="5" height="24" fill="#0f172a"/>
+              <rect x="16" y="0" width="2" height="24" fill="#0f172a"/>
+              <rect x="20" y="0" width="4" height="24" fill="#0f172a"/>
+              <rect x="26" y="0" width="3" height="24" fill="#0f172a"/>
+              <rect x="31" y="0" width="6" height="24" fill="#0f172a"/>
+              <rect x="39" y="0" width="2" height="24" fill="#0f172a"/>
+              <rect x="43" y="0" width="4" height="24" fill="#0f172a"/>
+              <rect x="49" y="0" width="3" height="24" fill="#0f172a"/>
+              <rect x="54" y="0" width="5" height="24" fill="#0f172a"/>
+              <rect x="61" y="0" width="2" height="24" fill="#0f172a"/>
+              <rect x="65" y="0" width="6" height="24" fill="#0f172a"/>
+              <rect x="73" y="0" width="3" height="24" fill="#0f172a"/>
+              <rect x="78" y="0" width="4" height="24" fill="#0f172a"/>
+              <rect x="84" y="0" width="2" height="24" fill="#0f172a"/>
+              <rect x="88" y="0" width="5" height="24" fill="#0f172a"/>
+              <rect x="95" y="0" width="3" height="24" fill="#0f172a"/>
+            </svg>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); margin-top: 4px;" id="pass-barcode-text">
+              *TF-GATE-PASS*
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: 16px; display: flex; justify-content: flex-end; gap: 10px;">
+        <button class="btn-secondary" onclick="window.print()">Print Ticket</button>
+        <button class="btn-primary" onclick="closeDigitalTicketModal()">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Notification Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

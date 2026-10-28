@@ -67,4 +67,14 @@ public class EventController {
     public String deleteEvent() {
         return "Event deleted";
     }
+
+    @Operation(
+        summary = "Update Event Status",
+        description = "Allows administrators to set event status (OPEN, CLOSED, UPCOMING). Requires ADMIN role."
+    )
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/admin/events/{id}/status")
+    public ResponseEntity<?> updateStatus(@PathVariable Long id, @RequestParam String status) {
+        return ResponseEntity.ok(eventService.updateEventStatus(id, status));
+    }
 }

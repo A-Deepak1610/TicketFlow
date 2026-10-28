@@ -4,7 +4,9 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -281,10 +283,17 @@ public class TicketBookingService {
                             .build())
                     .collect(Collectors.toList());
             
+            String targetEmail = (user != null && user.getEmail() != null && !user.getEmail().isBlank())
+                    ? user.getEmail()
+                    : "deepaka.ad24@bitsathy.ac.in";
+            String targetName = (user != null && user.getFullName() != null && !user.getFullName().isBlank())
+                    ? user.getFullName()
+                    : "Deepak A";
+
             // Build email DTO
             EmailNotificationDTO emailDTO = EmailNotificationDTO.builder()
-                    .toEmail(user.getEmail())
-                    .userName(user.getFullName())
+                    .toEmail(targetEmail)
+                    .userName(targetName)
                     .bookingReference(booking.getBookingReference())
                     .eventId(eventId)
                     .eventName(event.getEventName())
@@ -445,7 +454,79 @@ public class TicketBookingService {
         // Publish event to trigger admission of waiting users
         applicationEventPublisher.publishEvent(new BookingSlotFreedEvent(this, eventId));
     }
-    // public boolean validateEventDate(Integer eventId){
-    //     Event
-    // }
+
+    public List<Map<String, Object>> getUserBookings(Integer userId) {
+        List<Booking> bookings = bookingRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Booking booking : bookings) {
+            Map<String, Object> map = new HashMap<>();
+            map.put("bookingId", booking.getBookingId());
+            map.put("bookingReference", booking.getBookingReference());
+            map.put("status", booking.getStatus() != null ? booking.getStatus().name() : "CONFIRMED");
+            map.put("totalAmount", booking.getTotalAmount());
+            map.put("paymentStatus", booking.getPaymentStatus());
+            map.put("paymentId", booking.getPaymentId());
+            map.put("confirmedAt", booking.getConfirmedAt());
+            map.put("createdAt", booking.getCreatedAt());
+            map.put("eventId", booking.getEventId());
+
+            Event event = eventRepository.findById(booking.getEventId()).orElse(null);
+            if (event != null) {
+                map.put("eventName", event.getEventName());
+                map.put("eventDate", event.getEventDate());
+                map.put("venueName", event.getVenueName());
+            }
+
+            List<BookingSeat> bSeats = bookingSeatRepository.findByBookingId(booking.getBookingId());
+            List<Map<String, Object>> seatList = new ArrayList<>();
+            for (BookingSeat bs : bSeats) {
+                Map<String, Object> sMap = new HashMap<>();
+                Seat seat = seatRepository.findById(bs.getSeatId()).orElse(null);
+                sMap.put("seatNumber", seat != null ? seat.getSeatNumber() : "Seat-" + bs.getSeatId());
+                sMap.put("price", bs.getPrice());
+                seatList.add(sMap);
+            }
+            map.put("seats", seatList);
+            result.add(map);
+        }
+        return result;
+    }
+
+    public List<Map<String, Object>> getAllBookings() {
+        List<Booking> bookings = bookingRepository.findAll();
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Booking booking : bookings) {
+            Map<String, Object> map = new HashMap<>();
+            map.put("bookingId", booking.getBookingId());
+            map.put("bookingReference", booking.getBookingReference());
+            map.put("status", booking.getStatus() != null ? booking.getStatus().name() : "CONFIRMED");
+            map.put("totalAmount", booking.getTotalAmount());
+            map.put("paymentStatus", booking.getPaymentStatus());
+            map.put("paymentId", booking.getPaymentId());
+            map.put("confirmedAt", booking.getConfirmedAt());
+            map.put("createdAt", booking.getCreatedAt());
+            map.put("eventId", booking.getEventId());
+            map.put("userId", booking.getUserId());
+
+            Event event = eventRepository.findById(booking.getEventId()).orElse(null);
+            if (event != null) {
+                map.put("eventName", event.getEventName());
+                map.put("eventDate", event.getEventDate());
+                map.put("venueName", event.getVenueName());
+            }
+
+            List<BookingSeat> bSeats = bookingSeatRepository.findByBookingId(booking.getBookingId());
+            List<Map<String, Object>> seatList = new ArrayList<>();
+            for (BookingSeat bs : bSeats) {
+                Map<String, Object> sMap = new HashMap<>();
+                Seat seat = seatRepository.findById(bs.getSeatId()).orElse(null);
+                sMap.put("seatNumber", seat != null ? seat.getSeatNumber() : "Seat-" + bs.getSeatId());
+                sMap.put("price", bs.getPrice());
+                seatList.add(sMap);
+            }
+            map.put("seats", seatList);
+            result.add(map);
+        }
+        return result;
+    }
 }

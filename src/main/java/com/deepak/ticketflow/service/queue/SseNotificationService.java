@@ -55,10 +55,11 @@ public class SseNotificationService {
                 "status", status
         );
 
-        for (Map.Entry<Integer, Long> entry : userEvents.entrySet()) {
-            if (eventId.equals(entry.getValue())) {
-                Integer userId = entry.getKey();
-                SseEmitter emitter = emitters.get(userId);
+        for (Map.Entry<Integer, SseEmitter> entry : emitters.entrySet()) {
+            Integer userId = entry.getKey();
+            Long subscribedEventId = userEvents.get(userId);
+            if (subscribedEventId == null || eventId.equals(subscribedEventId)) {
+                SseEmitter emitter = entry.getValue();
                 if (emitter != null) {
                     try {
                         emitter.send(update);
@@ -141,10 +142,11 @@ public class SseNotificationService {
                 "status", status
         );
 
-        for (Map.Entry<Integer, Long> entry : userEvents.entrySet()) {
-            if (eventId.equals(entry.getValue())) {
-                Integer userId = entry.getKey();
-                SseEmitter emitter = emitters.get(userId);
+        for (Map.Entry<Integer, SseEmitter> entry : emitters.entrySet()) {
+            Integer userId = entry.getKey();
+            Long subscribedEventId = userEvents.get(userId);
+            if (subscribedEventId == null || eventId.equals(subscribedEventId)) {
+                SseEmitter emitter = entry.getValue();
                 if (emitter != null) {
                     try {
                         emitter.send(update);

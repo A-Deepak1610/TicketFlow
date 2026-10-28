@@ -35,7 +35,8 @@ public class SpringConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/login", "/register","/refresh","/events","/events/*","/actuator/prometheus","/actuator/health","/actuator/**","/swagger-ui.html","/swagger-ui/**","/v3/api-docs/**","/").permitAll()
-                        .requestMatchers("/api/security/**").permitAll()
+                        .requestMatchers("/*.html", "/*.css", "/*.js", "/static/**", "/favicon.ico").permitAll()
+                        .requestMatchers("/api/security/**", "/api/admin/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session->session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

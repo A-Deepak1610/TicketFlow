@@ -23,6 +23,8 @@ public class EventService {
     SeatRepository seatRepository;
     @Autowired
     EventSchedulerService schedulerService;
+    @Autowired
+    com.deepak.ticketflow.service.queue.SseNotificationService sseNotificationService;
 
     public EventWithSeatsResponse createEvent(CreateEventRequest request) {
         Event event = new Event();
@@ -88,5 +90,14 @@ public class EventService {
         }).toList();
         response.setSeats(seatResponses);
         return response;
+    }
+
+    public Event updateEventStatus(Long eventId, String status) {
+        Event event = eventRepository.findById(eventId).orElseThrow();
+        EventStatus newStatus = EventStatus.valueOf(status.toUpperCase());
+        event.setStatus(newStatus);
+        Event saved = eventRepository.save(event);
+        sseNotificationService.sendEventStatusUpdate(eventId, newStatus.name());
+        return saved;
     }
 }

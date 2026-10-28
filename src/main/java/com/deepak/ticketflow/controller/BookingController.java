@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;  // ← ADD THIS IMPORT
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -130,5 +131,26 @@ public class BookingController{
         );
 
         return ResponseEntity.ok(response);
+    }
+
+    @Operation(
+        summary = "Get User Bookings",
+        description = "Retrieves all confirmed and previous bookings for the currently authenticated user."
+    )
+    @GetMapping("/user/bookings")
+    public ResponseEntity<?> getUserBookings(@AuthenticationPrincipal CustomUserPrincipal principal) {
+        if (principal == null || principal.getUserId() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Unauthorized"));
+        }
+        return ResponseEntity.ok(ticketBookingService.getUserBookings(principal.getUserId()));
+    }
+
+    @Operation(
+        summary = "Get All Fleet Bookings (Admin)",
+        description = "Retrieves all bookings across all events for admin analytics."
+    )
+    @GetMapping("/admin/bookings")
+    public ResponseEntity<?> getAllBookings() {
+        return ResponseEntity.ok(ticketBookingService.getAllBookings());
     }
 }

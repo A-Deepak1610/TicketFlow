@@ -46,6 +46,17 @@ public class SecurityShieldController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Verify Google reCAPTCHA", description = "Verifies Google reCAPTCHA v2 response token and returns verified Captcha token.")
+    @PostMapping("/recaptcha/verify")
+    public ResponseEntity<CaptchaVerifyResponse> verifyRecaptcha(
+            @RequestBody Map<String, String> body,
+            HttpServletRequest request) {
+        String recaptchaToken = body != null ? body.get("recaptchaToken") : null;
+        String clientIp = extractClientIp(request);
+        CaptchaVerifyResponse response = captchaService.verifyGoogleRecaptcha(recaptchaToken, clientIp);
+        return ResponseEntity.ok(response);
+    }
+
     @Operation(summary = "Live Risk Assessment", description = "Evaluates client behavioral parameters and returns computed risk score.")
     @GetMapping("/risk-score")
     public ResponseEntity<RiskAssessmentResponse> getRiskScore(

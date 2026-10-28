@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In | TicketFlow Event Operations & Ticketing Engine</title>
+  <meta name="description" content="Secure authentication for TicketFlow. Role-based access for Platform Administrators and Ticketing Consumers.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body style="margin: 0; padding: 0; background-color: var(--bg-app);">
+
+<div class="login-page-wrapper">
+  <div class="login-bg-decor"></div>
+  <div class="login-bg-decor-2"></div>
+
+  <div class="login-card">
+    <!-- Header / Brand -->
+    <div class="login-header">
+      <div class="login-logo-container">TF</div>
+      <h2 class="login-title">Sign In to TicketFlow</h2>
+      <p class="login-subtitle">High-performance event ticketing, distributed queue &amp; anti-scalp shield</p>
+    </div>
+
+    <!-- Quick Role Switcher Cards -->
+    <div class="role-cards-container">
+      <span class="role-cards-label">SELECT DEMO PERSONA FOR INSTANT ACCESS:</span>
+      <div class="role-quick-grid">
+        <div class="role-select-card active-admin" id="card-role-admin" onclick="selectRole('admin')">
+          <span class="role-card-badge admin">Platform Admin</span>
+          <span class="role-card-user">flow_admin</span>
+          <span class="role-card-sub">Event Scheduler &amp; Bot Defense</span>
+        </div>
+
+        <div class="role-select-card" id="card-role-user" onclick="selectRole('user')">
+          <span class="role-card-badge user">Standard User</span>
+          <span class="role-card-user">flow_user</span>
+          <span class="role-card-sub">Seat Allocation &amp; Virtual Queue</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="login-divider">
+      <span>OR SIGN IN WITH CREDENTIALS</span>
+    </div>
+
+    <!-- Authentication Form -->
+    <form id="login-form" onsubmit="handleLoginSubmit(event)">
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label class="form-label">Username</label>
+        <div style="position: relative;">
+          <input type="text" id="input-username" name="userName" class="form-input" value="flow_admin" placeholder="Enter username..." required autocomplete="username">
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 22px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <label class="form-label" style="margin-bottom: 0;">Password</label>
+          <span style="font-size: 11px; color: var(--text-muted);">Default: password123</span>
+        </div>
+        <div class="password-input-group">
+          <input type="password" id="input-password" name="password" class="form-input" value="password123" placeholder="Enter password..." required autocomplete="current-password" style="padding-right: 40px;">
+          <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility()" title="Toggle Password Visibility">
+            <svg id="eye-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <button type="submit" class="login-submit-btn" id="btn-submit-login">
+        <span id="btn-submit-text">Sign In &amp; Continue</span>
+        <svg id="btn-submit-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+          <polyline points="12 5 19 12 12 19"></polyline>
+        </svg>
+      </button>
+    </form>
+
+    <!-- Security Shield Notice -->
+    <div class="login-footer-security">
+      <div class="pulse-dot" style="background-color: #10b981; width: 6px; height: 6px;"></div>
+      <span>Protected by <strong>TicketFlow Anti-Scalp Shield</strong> &amp; HMAC Tokens</span>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+const API_BASE = 'http://localhost:8080';
+
+const DEMO_CREDENTIALS = {
+  admin: {
+    userName: 'flow_admin',
+    password: 'password123',
+    role: 'ROLE_ADMIN',
+    redirectUrl: 'admin.html',
+    label: 'Platform Admin'
+  },
+  user: {
+    userName: 'flow_user',
+    password: 'password123',
+    role: 'ROLE_USER',
+    redirectUrl: 'user.html',
+    label: 'Standard User'
+  }
+};
+
+let currentSelectedRole = 'admin';
+
+function selectRole(roleKey) {
+  currentSelectedRole = roleKey;
+  const cardAdmin = document.getElementById('card-role-admin');
+  const cardUser = document.getElementById('card-role-user');
+  const inputUser = document.getElementById('input-username');
+  const inputPass = document.getElementById('input-password');
+
+  if (roleKey === 'admin') {
+    cardAdmin.className = 'role-select-card active-admin';
+    cardUser.className = 'role-select-card';
+    inputUser.value = DEMO_CREDENTIALS.admin.userName;
+    inputPass.value = DEMO_CREDENTIALS.admin.password;
+  } else {
+    cardAdmin.className = 'role-select-card';
+    cardUser.className = 'role-select-card active-user';
+    inputUser.value = DEMO_CREDENTIALS.user.userName;
+    inputPass.value = DEMO_CREDENTIALS.user.password;
+  }
+}
+
+function togglePasswordVisibility() {
+  const passInput = document.getElementById('input-password');
+  const eyeIcon = document.getElementById('eye-icon');
+  if (passInput.type === 'password') {
+    passInput.type = 'text';
+    eyeIcon.innerHTML = `
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+      <line x1="1" y1="1" x2="23" y2="23"></line>
+    `;
+  } else {
+    passInput.type = 'password';
+    eyeIcon.innerHTML = `
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+      <circle cx="12" cy="12" r="3"></circle>
+    `;
+  }
+}
+
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `<span>${message}</span>`;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
+}
+
+async function handleLoginSubmit(e) {
+  e.preventDefault();
+  const userName = document.getElementById('input-username').value.trim();
+  const password = document.getElementById('input-password').value;
+  const btn = document.getElementById('btn-submit-login');
+  const btnText = document.getElementById('btn-submit-text');
+
+  if (!userName || !password) {
+    showToast('Please enter both username and password', 'warning');
+    return;
+  }
+
+  btn.disabled = true;
+  btnText.textContent = 'Authenticating...';
+
+  try {
+    const res = await fetch(`${API_BASE}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userName, password })
+    });
+
+    if (!res.ok) {
+      throw new Error(res.status === 401 ? 'Invalid username or password' : `Server responded with HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    
+    // Extract role from response map or token or username heuristic
+    let userRole = data.role;
+    if (!userRole && data.accessToken) {
+      try {
+        const payload = JSON.parse(atob(data.accessToken.split('.')[1]));
+        userRole = payload.role;
+      } catch (e) {}
+    }
+    if (!userRole) {
+      userRole = userName.toLowerCase().includes('admin') ? 'ROLE_ADMIN' : 'ROLE_USER';
+    }
+
+    const sessionObj = {
+      userName: userName,
+      role: userRole,
+      accessToken: data.accessToken,
+      refreshToken: data.refreshToken,
+      userId: data.userId || (userRole === 'ROLE_ADMIN' ? 7149 : 7150),
+      displayName: userRole === 'ROLE_ADMIN' ? 'Vikram Sharma' : 'Deepak A.'
+    };
+
+    localStorage.setItem('ticketflow_session', JSON.stringify(sessionObj));
+
+    showToast(`Welcome back, ${sessionObj.displayName}! Redirecting...`, 'success');
+
+    // Role-based redirection
+    setTimeout(() => {
+      if (userRole === 'ROLE_ADMIN') {
+        window.location.href = 'admin.html';
+      } else {
+        window.location.href = 'user.html';
+      }
+    }, 700);
+
+  } catch (err) {
+    showToast(err.message, 'error');
+    btn.disabled = false;
+    btnText.textContent = 'Sign In & Continue';
+  }
+}
+</script>
+</body>
+</html>
